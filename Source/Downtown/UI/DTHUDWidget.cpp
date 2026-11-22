@@ -7,6 +7,7 @@
 #include "Vehicle/DTVehicleEntryComponent.h"
 #include "Vehicle/DTVehicleBase.h"
 #include "Wanted/DTWantedSubsystem.h"
+#include "World/Province/DTProvinceSubsystem.h"
 #include "GameFramework/PlayerController.h"
 
 void UDTHUDWidget::NativeConstruct()
@@ -18,6 +19,11 @@ void UDTHUDWidget::NativeConstruct()
 		Wanted->OnWantedLevelChanged.AddUniqueDynamic(this, &UDTHUDWidget::HandleWantedChanged);
 		Wanted->OnPlayerVisibilityChanged.AddUniqueDynamic(this, &UDTHUDWidget::HandleVisibilityChanged);
 		OnWantedLevelUpdated(Wanted->GetWantedLevel());
+	}
+
+	if (UDTProvinceSubsystem* Provinces = GetWorld()->GetSubsystem<UDTProvinceSubsystem>())
+	{
+		Provinces->OnProvinceChanged.AddUniqueDynamic(this, &UDTHUDWidget::HandleProvinceChanged);
 	}
 
 	if (APlayerController* PC = GetOwningPlayer())
@@ -33,6 +39,10 @@ void UDTHUDWidget::NativeDestruct()
 	{
 		Wanted->OnWantedLevelChanged.RemoveAll(this);
 		Wanted->OnPlayerVisibilityChanged.RemoveAll(this);
+	}
+	if (UDTProvinceSubsystem* Provinces = GetWorld() ? GetWorld()->GetSubsystem<UDTProvinceSubsystem>() : nullptr)
+	{
+		Provinces->OnProvinceChanged.RemoveAll(this);
 	}
 	Super::NativeDestruct();
 }
@@ -87,6 +97,16 @@ void UDTHUDWidget::HandleAmmoChanged(ADTWeaponBase* Weapon, int32 Magazine, int3
 void UDTHUDWidget::HandleWantedChanged(int32 NewLevel, int32 OldLevel)                           { OnWantedLevelUpdated(NewLevel); }
 void UDTHUDWidget::HandleVisibilityChanged(bool bSeen)                                            { OnWantedFlashingChanged(!bSeen); }
 void UDTHUDWidget::HandleFocusChanged(AActor* NewFocus, FText Prompt)                             { OnInteractionPromptChanged(Prompt, NewFocus != nullptr); }
+
+void UDTHUDWidget::HandleProvinceChanged(FName NewProvince, FName OldProvince, bool bFirstVisit)
+{
+	const UDTProvinceSubsystem* Provinces = GetWorld()->GetSubsystem<UDTProvinceSubsystem>();
+	FDTProvinceRow Row;
+	if (Provinces && Provinces->GetProvinceRow(NewProvince, Row))
+	{
+		OnProvinceEntered(Row.NameTH, Row.NameEN, Row.Region, bFirstVisit, Provinces->GetVisitedCount(), Provinces->GetProvinceCount());
+	}
+}
 
 void UDTHUDWidget::HandleVehicleState(EDTVehicleEntryState NewState, ADTVehicleBase* Vehicle)
 {

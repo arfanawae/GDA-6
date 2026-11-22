@@ -9,10 +9,13 @@ Indie-scale prototype of a third-person open-world action game built with **Unre
 | Traffic & pedestrian AI | `ADTTrafficLane`, `ADTTrafficAIController`, `ADTSidewalkPath`, `ADTPedestrianAIController`, `UDTPopulationSubsystem` |
 | Wanted level (1–3 stars) | `UDTWantedSubsystem`, `UDTPoliceDispatchSubsystem`, `ADTPoliceAIController`, `ADTPoliceVehicleAIController` |
 | HUD & minimap | `ADTHUD`, `UDTHUDWidget`, `UDTMinimapWidget`, `UDTMinimapSubsystem`, `UDTMapIconComponent` |
+| Thailand map (77 provinces, 1:20) | `UDTGeoLibrary`, `UDTGeoSettings`, `UDTProvinceSubsystem`, `ADTProvinceSign`, `ADTGeoImporter`, `ADTGeoRoad` |
 
 ## Documents
 - [`Docs/GDD.md`](Docs/GDD.md) — Game Design Document + step-by-step roadmap (Thai)
 - [`Docs/EditorSetup.md`](Docs/EditorSetup.md) — the Blueprint / asset checklist to wire the C++ into a playable level
+- [`Docs/ThailandMap.md`](Docs/ThailandMap.md) — scaled 1:20 map of Thailand (77 provinces): projection, OSM pipeline, province checkpoints, test scene (Thai)
+- [`Tools/GeoPipeline`](Tools/GeoPipeline) — Python scripts that turn real map data into game data
 
 ## Getting started
 1. Install **Unreal Engine 5.5+** and Visual Studio 2022 (Windows) or Xcode/Rider.
@@ -24,7 +27,8 @@ Indie-scale prototype of a third-person open-world action game built with **Unre
 
 ## Layout
 ```
-Config/                 Engine/Game/Input defaults (Enhanced Input enabled)
+Config/                 Engine/Game/Input defaults (Enhanced Input enabled), geo projection settings
+Tools/GeoPipeline/      Python: OSM/geoBoundaries -> province DataTable + road JSON
 Content/_Downtown/      All project assets (see Docs/GDD.md §2 for naming)
 Source/Downtown/
   Core/                 GameMode, PlayerController (input context swapping)
@@ -37,8 +41,13 @@ Source/Downtown/
   AI/Police/            Officer, cruiser driver, dispatch subsystem
   Wanted/               Wanted subsystem, crime + config data assets
   World/                Ambient population spawner + config
+    Geo/                Lat/lon projection, settings, OSM road importer
+    Province/           77-province data types, detection subsystem, border signs
   UI/                   HUD, minimap, map icons
 ```
+
+## Map data
+Province and road data are derived from OpenStreetMap — © OpenStreetMap contributors, ODbL. See `Content/_Downtown/Data/ATTRIBUTION.md`.
 
 ## Architecture rules
 - Gameplay logic in C++, tuning and asset wiring in Blueprint/Data Assets.

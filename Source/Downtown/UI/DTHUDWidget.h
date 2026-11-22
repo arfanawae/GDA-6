@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
 #include "Vehicle/DTVehicleEntryComponent.h"
+#include "World/Province/DTProvinceTypes.h"
 #include "DTHUDWidget.generated.h"
 
 class ADTPlayerCharacter;
@@ -32,6 +33,10 @@ protected:
 	UFUNCTION(BlueprintImplementableEvent, Category = "HUD") void OnWantedFlashingChanged(bool bFlashing);
 	UFUNCTION(BlueprintImplementableEvent, Category = "HUD") void OnInteractionPromptChanged(const FText& Prompt, bool bVisible);
 	UFUNCTION(BlueprintImplementableEvent, Category = "HUD") void OnVehicleModeChanged(bool bInVehicle);
+	/** Entered a new province (after the border hysteresis). Show the "ยินดีต้อนรับสู่..." banner. */
+	UFUNCTION(BlueprintImplementableEvent, Category = "HUD")
+	void OnProvinceEntered(const FText& NameTH, const FText& NameEN, EDTThaiRegion Region, bool bFirstVisit, int32 VisitedCount, int32 TotalCount);
+
 	/** Called every frame while driving. */
 	UFUNCTION(BlueprintImplementableEvent, Category = "HUD") void OnSpeedUpdated(float SpeedKmh);
 
@@ -46,6 +51,7 @@ private:
 	UFUNCTION() void HandleFocusChanged(AActor* NewFocus, FText Prompt);
 	UFUNCTION() void HandleVehicleState(EDTVehicleEntryState NewState, ADTVehicleBase* Vehicle);
 	UFUNCTION() void HandlePawnChanged(APawn* OldPawn, APawn* NewPawn);
+	UFUNCTION() void HandleProvinceChanged(FName NewProvince, FName OldProvince, bool bFirstVisit);
 
 	void BindToCharacter(ADTPlayerCharacter* Character);
 

@@ -33,6 +33,11 @@ public:
 
 	const TArray<TObjectPtr<ADTTrafficLane>>& GetNextLanes() const { return NextLanes; }
 
+	/** Used by ADTGeoImporter to build lanes from OpenStreetMap data. */
+	void InitializeFromPoints(const TArray<FVector>& WorldPoints, float InSpeedLimitKmh);
+	void AddNextLane(ADTTrafficLane* Lane) { if (Lane && Lane != this) NextLanes.AddUnique(Lane); }
+	void ClearNextLanes() { NextLanes.Reset(); }
+
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<USplineComponent> Spline;

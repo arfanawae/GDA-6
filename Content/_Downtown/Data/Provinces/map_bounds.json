@@ -1,0 +1,36 @@
+{
+  "config": {
+    "origin_lat": 13.0,
+    "origin_lon": 101.0,
+    "horizontal_scale": 20.0,
+    "vertical_scale": 5.0
+  },
+  "country": {
+    "MinX": -4107064,
+    "MinY": -1927907,
+    "MaxX": 4151982,
+    "MaxY": 2485933,
+    "SizeXKm": 82.59,
+    "SizeYKm": 44.14
+  },
+  "area": {
+    "codes": [
+      "TH-10",
+      "TH-12",
+      "TH-13"
+    ],
+    "MinX": 274714,
+    "MinY": -397901,
+    "MaxX": 709466,
+    "MaxY": -25823,
+    "SizeXKm": 4.35,
+    "SizeYKm": 3.72
+  },
+  "minimap": {
+    "image": "T_Minimap_TestArea.png",
+    "MinX": 274714,
+    "MinY": -397901,
+    "MaxX": 709466,
+    "MaxY": -26034
+  }
+}

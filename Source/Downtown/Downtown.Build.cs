@@ -15,7 +15,8 @@ public class Downtown : ModuleRules
 			"ChaosVehicles", "PhysicsCore",
 			"AIModule", "NavigationSystem", "GameplayTasks",
 			"UMG", "Slate", "SlateCore",
-			"MotionWarping"
+			"MotionWarping",
+			"DeveloperSettings", "Json"
 		});
 	}
 }

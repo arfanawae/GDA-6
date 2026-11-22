@@ -1,0 +1,4 @@
+shapely>=2.0
+numpy>=1.24
+pyarrow>=14      # only for the HDX GeoParquet road input
+Pillow>=10       # only for --minimap / preview_area.py

@@ -18,3 +18,9 @@ Build/
 Plugins/*/Binaries/
 Plugins/*/Intermediate/
 .DS_Store
+
+# Geo pipeline raw downloads (large, re-downloadable)
+Tools/GeoPipeline/raw/
+*.parquet
+__pycache__/
+.venv/

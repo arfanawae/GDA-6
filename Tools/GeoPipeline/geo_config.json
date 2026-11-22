@@ -1,0 +1,7 @@
+{
+  "_comment": "Single source of truth for the map projection. Must match UDTGeoSettings (Config/DefaultGame.ini).",
+  "origin_lat": 13.0,
+  "origin_lon": 101.0,
+  "horizontal_scale": 20.0,
+  "vertical_scale": 5.0
+}
