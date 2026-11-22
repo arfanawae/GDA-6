@@ -64,7 +64,7 @@ bool UDTPoliceDispatchSubsystem::FindSpawnPoint(FVector& OutLocation, bool bOnRo
 		}
 		else
 		{
-			const UNavigationSystemV1* Nav = UNavigationSystemV1::GetCurrent<UNavigationSystemV1>(GetWorld());
+			const UNavigationSystemV1* Nav = UNavigationSystemV1::GetCurrent(GetWorld());
 			FNavLocation NavLoc;
 			if (!Nav || !Nav->GetRandomReachablePointInRadius(Center, Config->SpawnDistanceMax, NavLoc)) continue;
 			Candidate = NavLoc.Location;

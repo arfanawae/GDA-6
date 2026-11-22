@@ -52,8 +52,8 @@ void ADTPoliceAIController::OnUnPossess()
 
 bool ADTPoliceAIController::IsPlayerPawn(const AActor* Actor) const
 {
-	const APawn* Pawn = Cast<APawn>(Actor);
-	return Pawn && Pawn->IsPlayerControlled(); // the player's character OR the vehicle they drive
+	const APawn* CandidatePawn = Cast<APawn>(Actor);
+	return CandidatePawn && CandidatePawn->IsPlayerControlled(); // the player's character OR the vehicle they drive
 }
 
 void ADTPoliceAIController::HandlePerception(AActor* Actor, FAIStimulus Stimulus)
@@ -154,7 +154,7 @@ void ADTPoliceAIController::Think()
 	{
 		State = EDTPoliceState::Search;
 		FNavLocation Point;
-		const UNavigationSystemV1* Nav = UNavigationSystemV1::GetCurrent<UNavigationSystemV1>(GetWorld());
+		const UNavigationSystemV1* Nav = UNavigationSystemV1::GetCurrent(GetWorld());
 		const float Radius = FMath::Min(Wanted->GetSearchRadius() * 0.5f, 3000.f);
 		if (Nav && Nav->GetRandomReachablePointInRadius(Wanted->GetLastKnownLocation(), Radius, Point))
 		{

@@ -8,9 +8,9 @@ void ADTPlayerController::OnPossess(APawn* InPawn)
 {
 	Super::OnPossess(InPawn);
 
-	if (ADTPlayerCharacter* Character = Cast<ADTPlayerCharacter>(InPawn))
+	if (ADTPlayerCharacter* PlayerChar = Cast<ADTPlayerCharacter>(InPawn))
 	{
-		PlayerCharacter = Character;
+		PlayerCharacter = PlayerChar;
 	}
 	ApplyMappingContexts(InPawn);
 }

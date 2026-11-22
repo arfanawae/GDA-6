@@ -7,6 +7,7 @@ Build/
 .vs/
 .vscode/
 .idea/
+.vsconfig
 *.sln
 *.suo
 *.opensdf

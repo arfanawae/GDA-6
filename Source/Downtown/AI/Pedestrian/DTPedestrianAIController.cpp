@@ -45,9 +45,9 @@ void ADTPedestrianAIController::OnPossess(APawn* InPawn)
 	Super::OnPossess(InPawn);
 
 	PerceptionComponent->OnTargetPerceptionUpdated.AddUniqueDynamic(this, &ADTPedestrianAIController::HandlePerception);
-	if (ADTCharacterBase* Character = Cast<ADTCharacterBase>(InPawn))
+	if (ADTCharacterBase* CharacterBase = Cast<ADTCharacterBase>(InPawn))
 	{
-		Character->GetHealthComponent()->OnHealthChanged.AddUniqueDynamic(this, &ADTPedestrianAIController::HandleDamaged);
+		CharacterBase->GetHealthComponent()->OnHealthChanged.AddUniqueDynamic(this, &ADTPedestrianAIController::HandleDamaged);
 	}
 
 	if (ADTPedestrianCharacter* Ped = Cast<ADTPedestrianCharacter>(InPawn); Ped && Ped->GetStartPath())
@@ -174,8 +174,8 @@ void ADTPedestrianAIController::HandleDamaged(UDTHealthComponent* Health, float 
 
 void ADTPedestrianAIController::Panic(FVector InThreatLocation)
 {
-	const ADTCharacterBase* Character = Cast<ADTCharacterBase>(GetPawn());
-	if (!Character || Character->IsDead())
+	const ADTCharacterBase* CharacterBase = Cast<ADTCharacterBase>(GetPawn());
+	if (!CharacterBase || CharacterBase->IsDead())
 	{
 		return;
 	}
@@ -193,7 +193,7 @@ void ADTPedestrianAIController::Panic(FVector InThreatLocation)
 void ADTPedestrianAIController::StartFlee()
 {
 	const APawn* MyPawn = GetPawn();
-	const UNavigationSystemV1* Nav = UNavigationSystemV1::GetCurrent<UNavigationSystemV1>(GetWorld());
+	const UNavigationSystemV1* Nav = UNavigationSystemV1::GetCurrent(GetWorld());
 	if (!MyPawn || !Nav)
 	{
 		return;
