@@ -48,5 +48,5 @@ double UDTGeoLibrary::ElevationToWorldZ(double HeightMeters)
 FString UDTGeoLibrary::FormatLatLon(const FVector& WorldLocation)
 {
 	const FVector2D LL = WorldToLatLon(WorldLocation);
-	return FString::Printf(TEXT("%.4f°%s %.4f°%s"), FMath::Abs(LL.X), LL.X >= 0 ? TEXT("N") : TEXT("S"), FMath::Abs(LL.Y), LL.Y >= 0 ? TEXT("E") : TEXT("W"));
+	return FString::Printf(TEXT("%.4f\u00B0%s %.4f\u00B0%s"), FMath::Abs(LL.X), LL.X >= 0 ? TEXT("N") : TEXT("S"), FMath::Abs(LL.Y), LL.Y >= 0 ? TEXT("E") : TEXT("W"));
 }

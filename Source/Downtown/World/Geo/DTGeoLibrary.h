@@ -30,7 +30,7 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Geo")
 	static double ElevationToWorldZ(double HeightMeters);
 
-	/** "13.7563°N 100.5018°E" for debug HUDs. */
+	/** "13.7563 N 100.5018 E" (with degree signs) for debug HUDs. */
 	UFUNCTION(BlueprintPure, Category = "Geo")
 	static FString FormatLatLon(const FVector& WorldLocation);
 };

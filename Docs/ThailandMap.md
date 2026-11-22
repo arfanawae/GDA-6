@@ -179,11 +179,27 @@ USTRUCT() struct FDTProvinceRow : FTableRowBase    // Row Name = "TH-10"
 3. World Settings → World Partition → Runtime Settings → Grid "MainGrid": **Cell Size 25,600** (256 ม.), **Loading Range 76,800** (768 ม.) ซึ่งเหมาะกับรถที่วิ่ง 100–140 กม./ชม.
 4. วาง `PlayerStart` ที่จุดอ้างอิงของนนทบุรี: **X = 514,666  Y = −327,855** (Z ให้อยู่เหนือพื้น) แล้วขับไปทางตะวันออกเฉียงใต้เข้ากรุงเทพฯ (X 429,475  Y −203,123) หรือไปทางตะวันออกเฉียงเหนือเข้าปทุมธานี (X 592,339  Y −170,989)
 
-### 8.4 นำเข้าถนนและป้าย
+### 8.4 นำเข้าถนนและป้าย (ทดสอบทีละโซน)
 1. วาง Actor **DTGeoImporter** (Place Actors → ค้นหา "DTGeoImporter")
-2. RoadsFile = `_Downtown/Data/Roads/Roads_TestArea.json`, (ถ้ามี) RoadMesh = Plane ขนาด 1 ม., SignClass = `BP_ProvinceSign`
-3. กด **Import** ใน Details panel แล้วดูผลใน Output Log บรรทัด `GeoImport: … road pieces, … traffic lanes, … province signs`
-4. ถ้าต้องการลบของที่นำเข้าทั้งหมด ให้กด **Clear Imported**
+2. ตั้งค่าใน Details panel:
+   - RoadsFile = `_Downtown/Data/Roads/Roads_TestArea.json`
+   - **ZoneFilter** = `test-area`, `TH-12`, `Nonthaburi`, `นนทบุรี`, `TH-10,TH-13`, `bangkok-metro`, `north` … หรือเว้นว่าง/`all` เพื่อนำเข้าทั้งไฟล์
+   - ProvinceTable = `DT_Provinces` (ค่าเริ่มต้นชี้ไปที่ `/Game/_Downtown/Data/Provinces/DT_Provinces`)
+   - SignClass = `BP_ProvinceSign` (ถ้ามีแล้ว)
+3. กดปุ่มตามลำดับ:
+
+| ปุ่ม | ทำอะไร |
+|---|---|
+| **Validate Data** | อ่านไฟล์และตรวจทุกอย่าง แล้วบอกว่า "จะ" spawn อะไรบ้าง แต่ไม่ spawn จริง |
+| **Preview Zone** | วาดเส้นขอบจังหวัดในโซนเป็นสีเหลือง และจุดอ้างอิงเป็นทรงกลมสีเขียว ค้างใน Viewport 30 วินาที พร้อม log ขอบเขต (ใช้เช็กว่า Landscape คลุมโซนครบไหม) |
+| **Import** | spawn จริง ทุก Actor ติด Tag `DTGeoImported`, `DTGeoRun_<n>`, `DTGeoZone_<โซน>` |
+| **Clear Last Run** | ลบเฉพาะของที่ Import รอบล่าสุด |
+| **Clear Zone** | ลบของที่ Import ไว้สำหรับโซนใน ZoneFilter |
+| **Clear Imported** | ลบของที่ Importer ทุกตัว spawn ไว้ |
+
+- `ClearBeforeImport` (ค่าเริ่มต้น `SameZone`): Import โซนเดิมซ้ำจะลบของเก่าก่อนเสมอ ถ้าเลือก `None` จะวางหลายโซนซ้อนกันได้
+- `bTrimRoadsToZone`: ตัดถนนที่เส้นเขตของโซน (ถ้าปิด จะเก็บถนนทั้งเส้นที่แตะโซน)
+- World Partition: การ Clear จะเจอเฉพาะ Actor ใน Cell ที่โหลดอยู่ ต้องโหลด Region ก่อน
 
 ### 8.5 GameMode / HUD
 - `BP_GameMode`: ProvinceTable = `DT_Provinces`, MinimapWorldBounds = ค่า `minimap` ใน `map_bounds.json` (Min 274714, −397901 / Max 709466, −26034)
@@ -193,7 +209,46 @@ USTRUCT() struct FDTProvinceRow : FTableRowBase    // Row Name = "TH-10"
 
 ---
 
-## 9. แผนการทดสอบ (สเกล + การโหลด)
+## 9. อ่านผลใน Output Log
+
+เปิด **Window → Output Log** แล้วพิมพ์ `LogDTGeo` ในช่อง Search (ทุกบรรทัดของระบบนี้ใช้ Category นี้) ตัวอย่างบรรทัดที่ควรเห็นหลังกด Import:
+
+```
+LogDTGeo: [GeoImport] ===== IMPORT run #1 | importer DTGeoImporter_0 | zone 'test-area' =====
+LogDTGeo: [GeoImport] Projection: origin 13.0000 N 101.0000 E = world (0,0); horizontal 1:20 (1 km in game = 20 km real, 100 km real = 5.00 km in game); vertical 1:5; road level 700 cm
+LogDTGeo: [GeoImport] Province table /Game/_Downtown/Data/Provinces/DT_Provinces.DT_Provinces: 77/77 provinces usable.
+LogDTGeo: [GeoImport] Zone 'test-area' -> 3 province(s): TH-10 Bangkok, TH-12 Nonthaburi, TH-13 Pathum Thani
+LogDTGeo: [GeoImport] Reading C:/.../Content/_Downtown/Data/Roads/Roads_TestArea.json (334.1 KB)
+LogDTGeo: [GeoImport] File projection: origin 13.0000 N 101.0000 E, 1:20
+LogDTGeo: [GeoImport] Roads in file 1481 -> spawned ... road pieces, ... traffic lanes (... junction links)
+LogDTGeo: [GeoImport]   skipped roads: ... outside zone, 0 malformed, 0 with < 2 valid points; ...
+LogDTGeo: [GeoImport] Ground trace: .../... points hit the ground, ... used BaseZ=0
+LogDTGeo: [GeoImport] Result bounds X ...  = 4.3x km x 3.7x km in game (8x x 7x km real) | lat 13.5.. , lon 100.3..
+LogDTGeo: [GeoImport] ===== done in 1.23 s | undo with 'Clear Last Run' (tag DTGeoRun_1) or 'Clear Zone' (tag DTGeoZone_test-area) =====
+```
+
+สัญญาณที่ต้องระวัง:
+- `Warning: ... point(s) skipped` / `road #N skipped`: ข้อมูลในไฟล์มีพิกัดว่าง ผิดรูปแบบ หรืออยู่นอกขอบเขต (เกิน ±100 กม.) ระบบข้ามรายการนั้นไป แสดงรายละเอียด 10 รายการแรก (ปรับได้ที่ `MaxDetailedWarnings`)
+- `Error: ... projection mismatch`: ไฟล์ถูกสร้างด้วยสเกลหรือ Origin คนละค่ากับ Project Settings ระบบจะไม่ spawn อะไรเลย
+- `No ground under ANY point`: ไม่มี Landscape ใต้โซน หรือ Cell ยังไม่โหลด ให้กด Preview Zone เพื่อดูตำแหน่ง
+- `Zone provinces NOT in this file`: ไฟล์ถนนไม่ครอบคลุมจังหวัดนั้น ให้สร้างไฟล์ใหม่ด้วย `build_roads.py --area ...`
+
+ตอนเล่น (PIE) ใช้คำสั่ง Console (กด `~`):
+
+| คำสั่ง | ผลใน Log |
+|---|---|
+| `dt.Province.Zone TH-12` / `dt.Province.Zone all` | จำกัดการตรวจจับเฉพาะโซน |
+| `dt.Province.List test-area` | รายชื่อจังหวัด จุดอ้างอิง lat/lon และขนาดในเกม/จริง |
+| `dt.Province.Where` | ตำแหน่งผู้เล่น (X/Y/Z, lat/lon) และจังหวัดที่อยู่ |
+| `dt.Province.Teleport Nonthaburi` | วาร์ป (รับทั้งรหัสและชื่อไทย/อังกฤษ) |
+| `dt.Province.ResetVisited` | ล้างความคืบหน้า X/77 |
+| `dt.Province.LogChecks 1` | log ทุกจังหวะที่ตรวจเจอจังหวัดใหม่ (ช่วงรอยืนยัน 0.6 วินาที) |
+| `dt.Province.DrawBorders 1` | วาดเส้นเขต (เขียว = ปัจจุบัน, เหลือง = ในโซน, เทา = นอกโซน) |
+
+ตอนเริ่ม PIE จะเห็น `[Province] Loaded 77/77 provinces ... (Central 22, Northeast 20, ...)` และเมื่อข้ามเขตจะเห็น
+`[Province] Entered TH-12 Nonthaburi / นนทบุรี (Central) from TH-10 Bangkok | FIRST VISIT | visited 2/77 | at X=... (13.86..N 100.49..E)`
+
+## 10. แผนการทดสอบ (สเกล + การโหลด)
 
 | # | ทดสอบ | วิธี | ผ่านเมื่อ |
 |---|---|---|---|
@@ -208,7 +263,7 @@ USTRUCT() struct FDTProvinceRow : FTableRowBase    // Row Name = "TH-10"
 
 ---
 
-## 10. Roadmap ไปให้ครบ 77 จังหวัด
+## 11. Roadmap ไปให้ครบ 77 จังหวัด
 
 1. **ฉากทดสอบ 2 (ภูเขา):** เชียงใหม่ (TH-50), ลำพูน (TH-51), ลำปาง (TH-52) เพื่อทดสอบ Heightmap จริง (Copernicus DEM ÷ VerticalScale) และถนนบนเขา
 2. **Heightmap ทั้งประเทศ:** แบ่ง Landscape ตามภาค ความละเอียด 4–8 ม./quad (ทั้งประเทศ ~83 × 44 กม.) แล้วใช้ PCG เติมรายละเอียด

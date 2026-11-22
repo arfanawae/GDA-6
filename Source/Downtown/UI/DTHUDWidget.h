@@ -33,7 +33,7 @@ protected:
 	UFUNCTION(BlueprintImplementableEvent, Category = "HUD") void OnWantedFlashingChanged(bool bFlashing);
 	UFUNCTION(BlueprintImplementableEvent, Category = "HUD") void OnInteractionPromptChanged(const FText& Prompt, bool bVisible);
 	UFUNCTION(BlueprintImplementableEvent, Category = "HUD") void OnVehicleModeChanged(bool bInVehicle);
-	/** Entered a new province (after the border hysteresis). Show the "ยินดีต้อนรับสู่..." banner. */
+	/** Entered a new province (after the border hysteresis). Show the "Welcome to <province>" banner. */
 	UFUNCTION(BlueprintImplementableEvent, Category = "HUD")
 	void OnProvinceEntered(const FText& NameTH, const FText& NameEN, EDTThaiRegion Region, bool bFirstVisit, int32 VisitedCount, int32 TotalCount);
 

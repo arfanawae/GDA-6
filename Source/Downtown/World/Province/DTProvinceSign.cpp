@@ -29,5 +29,5 @@ void ADTProvinceSign::BeginPlay()
 
 void ADTProvinceSign::ApplyProvinceText_Implementation(const FText& NameTH, const FText& NameEN)
 {
-	Text->SetText(FText::Format(NSLOCTEXT("Downtown", "ProvinceSign", "ยินดีต้อนรับสู่ {0}\nWelcome to {1}"), NameTH, NameEN));
+	Text->SetText(FText::Format(NSLOCTEXT("Downtown", "ProvinceSign", "\u0E22\u0E34\u0E19\u0E14\u0E35\u0E15\u0E49\u0E2D\u0E19\u0E23\u0E31\u0E1A\u0E2A\u0E39\u0E48 {0}\nWelcome to {1}"), NameTH, NameEN));
 }

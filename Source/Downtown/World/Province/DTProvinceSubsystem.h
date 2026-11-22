@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Subsystems/WorldSubsystem.h"
 #include "World/Province/DTProvinceTypes.h"
+#include "World/Province/DTProvinceGeometry.h"
 #include "DTProvinceSubsystem.generated.h"
 
 class UDataTable;
@@ -17,8 +18,17 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FDTOnProvinceChanged, FName, NewP
  *  - A new province must hold for ConfirmSeconds before the change is announced, so driving
  *    along a border road does not spam the HUD.
  *  - Remembers visited provinces (checkpoint / collection progress).
+ *  - An optional "active zone" limits detection to some provinces for focused tests.
  *
- * Console: dt.Province.Teleport TH-12   dt.Province.DrawBorders 1
+ * Console (PIE / game):
+ *   dt.Province.Zone <zone|all>      limit detection, e.g. dt.Province.Zone test-area
+ *   dt.Province.List [zone]          list provinces with reference points and bounds
+ *   dt.Province.Where                where is the player (world, lat/lon, province)
+ *   dt.Province.Teleport <code|name> e.g. dt.Province.Teleport TH-12 / Nonthaburi
+ *   dt.Province.ResetVisited         clear checkpoint progress
+ *   dt.Province.DrawBorders 1        draw borders around the player
+ *   dt.Province.LogChecks 1          verbose log of every detection step
+ * All output goes to the LogDTGeo category.
  */
 UCLASS()
 class DOWNTOWN_API UDTProvinceSubsystem : public UTickableWorldSubsystem
@@ -31,7 +41,7 @@ public:
 	virtual TStatId GetStatId() const override { RETURN_QUICK_DECLARE_CYCLE_STAT(UDTProvinceSubsystem, STATGROUP_Tickables); }
 	virtual bool DoesSupportWorldType(const EWorldType::Type WorldType) const override;
 
-	/** Province containing a world location, or NAME_None (sea / outside Thailand). */
+	/** Province containing a world location, or NAME_None (sea / outside Thailand / outside the active zone). */
 	UFUNCTION(BlueprintCallable, Category = "Province")
 	FName FindProvinceAt(const FVector& WorldLocation, FName Hint = NAME_None) const;
 
@@ -48,7 +58,7 @@ public:
 	int32 GetVisitedCount() const { return Visited.Num(); }
 
 	UFUNCTION(BlueprintPure, Category = "Province")
-	int32 GetProvinceCount() const { return Provinces.Num(); }
+	int32 GetProvinceCount() const { return Geometry.Num(); }
 
 	/** Restore progress (e.g. from a save game). Does not fire events. */
 	UFUNCTION(BlueprintCallable, Category = "Province")
@@ -57,9 +67,34 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Province")
 	TArray<FName> GetVisited() const { return Visited.Array(); }
 
+	UFUNCTION(BlueprintCallable, Category = "Province")
+	void ResetVisited();
+
 	/** Moves the player (or the vehicle they drive) to a province's reference point. */
 	UFUNCTION(BlueprintCallable, Category = "Province")
 	bool TeleportPlayerToProvince(FName Code);
+
+	/** Same, but accepts a code or Thai/English name ("TH-12", "Nonthaburi"). Uses the first match. */
+	UFUNCTION(BlueprintCallable, Category = "Province|Testing")
+	bool TeleportPlayerToZone(const FString& Zone);
+
+	/**
+	 * Test helper: only provinces of this zone are detected ("all"/"" = every province).
+	 * Same zone syntax as ADTGeoImporter::ZoneFilter. Returns false (and logs why) for unknown zones.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Province|Testing")
+	bool SetActiveZone(const FString& Zone);
+
+	UFUNCTION(BlueprintPure, Category = "Province|Testing")
+	FString GetActiveZone() const { return ActiveZoneName; }
+
+	/** Logs every province of a zone with reference point, lat/lon and size. */
+	UFUNCTION(BlueprintCallable, Category = "Province|Testing")
+	void LogZone(const FString& Zone) const;
+
+	/** Logs the player's world position, lat/lon and detected province. */
+	UFUNCTION(BlueprintCallable, Category = "Province|Testing")
+	void LogPlayerLocation() const;
 
 	UPROPERTY(BlueprintAssignable, Category = "Province")
 	FDTOnProvinceChanged OnProvinceChanged;
@@ -67,24 +102,22 @@ public:
 	void DebugDrawBorders() const;
 
 protected:
-	struct FRuntimeProvince
-	{
-		FDTProvinceRow Row;
-		FBox2D Bounds;
-		TArray<FBox2D> RingBounds;
-	};
-
-	bool Contains(const FRuntimeProvince& P, const FVector2D& Point) const;
-	static bool PointInRing(const TArray<FVector2D>& Ring, const FVector2D& Point);
 	void SetCurrent(FName NewProvince);
+	void LogLoadSummary(const UDataTable* Table, const TArray<FString>& Warnings) const;
+	FString DescribeLocation(const FVector& Location) const;
 
-	TMap<FName, FRuntimeProvince> Provinces;
+	FDTProvinceGeometry Geometry;
 	TSet<FName> Visited;
+
+	/** Empty = all provinces. */
+	TSet<FName> ActiveZone;
+	FString ActiveZoneName = TEXT("all");
 
 	FName CurrentProvince = NAME_None;
 	FName PendingProvince = NAME_None;
 	float PendingTime = 0.f;
 	float CheckTimer = 0.f;
+	bool bLoggedOutside = false;
 
 	/** Seconds between checks. */
 	float CheckInterval = 0.2f;

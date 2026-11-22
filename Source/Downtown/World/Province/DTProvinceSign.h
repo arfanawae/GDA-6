@@ -7,7 +7,7 @@
 class UTextRenderComponent;
 
 /**
- * "ยินดีต้อนรับสู่จังหวัด..." roadside sign, spawned by ADTGeoImporter at every road/border crossing.
+ * "Welcome to <province>" (Thai + English) roadside sign, spawned by ADTGeoImporter at every road/border crossing.
  * BP_ProvinceSign adds the mesh; the text is filled from DT_Provinces at BeginPlay.
  * NOTE: TextRender/UMG need a font with Thai glyphs (e.g. Noto Sans Thai, Sarabun) - the default Roboto has none.
  */
