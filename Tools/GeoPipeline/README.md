@@ -65,6 +65,9 @@ python build_provinces.py --boundaries raw/tha_adm1.geojson --area TH-10,TH-12,T
 # Roads + border-crossing signs for the test area
 python build_roads.py --input raw/roads.parquet --area TH-10,TH-12,TH-13 --name TestArea
 
+# Terrain: Copernicus DEM -> 16-bit Landscape heightmap (+ road gradient report)
+python build_heightmap.py --area TH-50,TH-51,TH-52 --name North3 --download --roads ../../Content/_Downtown/Data/Roads/Roads_North3.json
+
 # Visual check
 python preview_area.py --name TestArea --out raw/preview_TestArea.png
 
@@ -81,6 +84,7 @@ python geo_projection.py
 | `build_provinces.py` | → `Content/_Downtown/Data/Provinces/DT_Provinces.json`, `provinces_summary.csv`, `map_bounds.json` |
 | `build_roads.py` | → `Content/_Downtown/Data/Roads/Roads_<name>.json` (roads + crossings). Also accepts GeoJSON or Overpass JSON |
 | `preview_area.py` | renders provinces + roads + crossings to a PNG |
+| `build_heightmap.py` | Copernicus GLO-30 DEM → `.r16`/16-bit PNG heightmap + exact Landscape import values (sea level = Z 0) + road gradient table per vertical scale |
 | `prepare_geodata.py` | step 0: clean/filter/split raw GeoJSON / Shapefile / CSV per province or zone |
 
 ## Changing the scale

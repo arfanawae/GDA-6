@@ -3,4 +3,5 @@ numpy>=1.24
 pyshp>=2.3       # .shp input (prepare_geodata.py)
 pyproj>=3.6      # only for projected input (e.g. UTM 47N/48N government data)
 pyarrow>=14      # only for the HDX GeoParquet road input (build_roads.py)
-Pillow>=10       # only for --minimap / preview_area.py
+Pillow>=10       # --minimap / preview_area.py / build_heightmap.py
+rasterio>=1.3    # build_heightmap.py (Copernicus DEM GeoTIFFs; Windows wheels include GDAL)

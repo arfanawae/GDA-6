@@ -24,7 +24,7 @@ class GeoConfig:
     origin_lat: float = 13.0
     origin_lon: float = 101.0
     horizontal_scale: float = 20.0  # 20 -> 100 km real = 5 km in game
-    vertical_scale: float = 5.0     # heights are squashed less, otherwise mountains look flat
+    vertical_scale: float = 10.0    # 2x exaggerated vs horizontal: mountains read well, roads stay drivable (see build_heightmap.py --roads)
 
     @staticmethod
     def load(path: Path | None = None) -> "GeoConfig":

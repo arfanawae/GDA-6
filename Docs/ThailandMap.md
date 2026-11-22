@@ -1,7 +1,7 @@
 # แผนที่ประเทศไทยย่อสเกล (77 จังหวัด) — คู่มือเริ่มต้น
 
 **Engine:** Unreal Engine 5 (ใช้ต่อกับระบบเดิมของโปรเจกต์ เช่น Traffic, HUD, Minimap)
-**สเกล:** ระยะทางแนวราบ 1:20 (ระยะจริง 100 กม. = 5 กม. ในเกม), ความสูงภูมิประเทศ 1:5
+**สเกล:** ระยะทางแนวราบ 1:20 (ระยะจริง 100 กม. = 5 กม. ในเกม), ความสูงภูมิประเทศ 1:10 (เปลี่ยนจาก 1:5 หลังวัดความชันถนนจริง ดูข้อ 11)
 **ฉากทดสอบแรก:** กรุงเทพฯ (TH-10), นนทบุรี (TH-12), ปทุมธานี (TH-13) ซึ่งติดกันครบทั้ง 3 จังหวัด
 
 > ส่วนที่เป็น Python (`Tools/GeoPipeline`) ให้ผลลัพธ์เป็น JSON ที่ใช้กับ Engine ไหนก็ได้
@@ -24,6 +24,7 @@
 รถ คน อาคาร และความกว้างถนนต้องเป็นขนาดจริง (เลนกว้าง 3.5 ม.) ไม่อย่างนั้นจะขับไม่ได้ ผลที่ตามมาคือ:
 - ความเร็วรถใช้ค่าจริงได้เลย (100 กม./ชม.) โลกจึงดู "เล็กลง 20 เท่า" ในแง่เวลาเดินทาง
 - เมืองที่ถนนหนาแน่นจะเบียดกัน จากการวัดในฉากทดสอบ **ถนนคนละสายที่อยู่ห่างกันไม่ถึง 10 ม. (ในเกม) มีประมาณ 19% ของความยาวถนน** (ดูข้อ 7)
+- ความชันถูกขยาย HorizontalScale ÷ VerticalScale เท่า (1:20 ÷ 1:10 = **×2**) ถนนชัน 8% จริงจะชัน 16% ในเกม
 - ถนนที่มีเกาะกลาง OSM วาดไว้เป็น 2 เส้นห่างกัน ~20 ม. พอย่อแล้วเหลือ ~1 ม. และทับกัน ตัว Importer แก้ให้อัตโนมัติ (`bSeparateDualCarriageways`)
 
 ---
@@ -175,7 +176,7 @@ USTRUCT() struct FDTProvinceRow : FTableRowBase    // Row Name = "TH-10"
 2. ลบ Landscape ที่ติดมากับ Template แล้วสร้างใหม่ให้พอดีพื้นที่ทดสอบ (4.35 × 3.72 กม.):
    - Landscape Mode → New, Section Size 127, Sections/Component 2×2, **Number of Components 10 × 10** (2,541 quads), **Scale X/Y = 200** (2 ม./quad) → ได้ **5.08 กม.**
    - Location: **X = 238,090  Y = −465,862  Z = 0** (มุมของ Landscape อยู่ที่มุมพื้นที่ทดสอบ เผื่อขอบไว้ ~350 ม.)
-   - กรุงเทพฯ แทบไม่มีความสูง พื้นราบจึงใช้ได้ ส่วน Heightmap จริงค่อยใส่ในเฟสภาคเหนือ (ข้อ 10)
+   - กรุงเทพฯ แทบไม่มีความสูง ใช้พื้นราบได้ (แนะนำ) หรือจะใช้ Heightmap จริงก็ได้: `python build_heightmap.py --area test-area --name TestArea --max-quad-m 2.5 --download` แล้ว import ตามค่าที่สคริปต์พิมพ์ออกมา (2017×2017, Scale 246/246/1.0) แต่ข้อมูล Copernicus เป็น DSM จึงมีความสูงอาคารปนมาด้วย (สูงสุดประมาณ 40 ม. หรือ 4 ม. ในเกม)
 3. World Settings → World Partition → Runtime Settings → Grid "MainGrid": **Cell Size 25,600** (256 ม.), **Loading Range 76,800** (768 ม.) ซึ่งเหมาะกับรถที่วิ่ง 100–140 กม./ชม.
 4. วาง `PlayerStart` ที่จุดอ้างอิงของนนทบุรี: **X = 514,666  Y = −327,855** (Z ให้อยู่เหนือพื้น) แล้วขับไปทางตะวันออกเฉียงใต้เข้ากรุงเทพฯ (X 429,475  Y −203,123) หรือไปทางตะวันออกเฉียงเหนือเข้าปทุมธานี (X 592,339  Y −170,989)
 
@@ -215,7 +216,7 @@ USTRUCT() struct FDTProvinceRow : FTableRowBase    // Row Name = "TH-10"
 
 ```
 LogDTGeo: [GeoImport] ===== IMPORT run #1 | importer DTGeoImporter_0 | zone 'test-area' =====
-LogDTGeo: [GeoImport] Projection: origin 13.0000 N 101.0000 E = world (0,0); horizontal 1:20 (1 km in game = 20 km real, 100 km real = 5.00 km in game); vertical 1:5; road level 700 cm
+LogDTGeo: [GeoImport] Projection: origin 13.0000 N 101.0000 E = world (0,0); horizontal 1:20 (1 km in game = 20 km real, 100 km real = 5.00 km in game); vertical 1:10; road level 700 cm
 LogDTGeo: [GeoImport] Province table /Game/_Downtown/Data/Provinces/DT_Provinces.DT_Provinces: 77/77 provinces usable.
 LogDTGeo: [GeoImport] Zone 'test-area' -> 3 province(s): TH-10 Bangkok, TH-12 Nonthaburi, TH-13 Pathum Thani
 LogDTGeo: [GeoImport] Reading C:/.../Content/_Downtown/Data/Roads/Roads_TestArea.json (334.1 KB)
@@ -263,9 +264,71 @@ LogDTGeo: [GeoImport] ===== done in 1.23 s | undo with 'Clear Last Run' (tag DTG
 
 ---
 
-## 11. Roadmap ไปให้ครบ 77 จังหวัด
+## 11. ฉากทดสอบ 2: ภูเขา (เชียงใหม่ – ลำพูน – ลำปาง)
 
-1. **ฉากทดสอบ 2 (ภูเขา):** เชียงใหม่ (TH-50), ลำพูน (TH-51), ลำปาง (TH-52) เพื่อทดสอบ Heightmap จริง (Copernicus DEM ÷ VerticalScale) และถนนบนเขา
+ฉากนี้ใช้ทดสอบภูมิประเทศจริง ถนนบนเขา และ Landscape ขนาดใหญ่ใน World Partition
+
+### 11.1 ความชันของถนน: เหตุผลที่เปลี่ยน VerticalScale เป็น 1:10
+วัดจากถนนสายหลักจริงในพื้นที่รวม 1,653 กม. ด้วย Copernicus DEM (สุ่มทุก 200 ม.):
+
+| สเกลความสูง | ความชันที่ 50% ของถนน | 90% | 99% | สัดส่วนถนนที่ชันกว่า 15% |
+|---|---|---|---|---|
+| ของจริง | 0.9% | 5.0% | 13.4% | — |
+| 1:5 (ค่าเดิม) | 3.5% | 20.0% | **53.7%** | **14.4%** |
+| **1:10 (ค่าใหม่)** | 1.8% | 10.0% | 26.9% | **4.9%** |
+| 1:15 | 1.2% | 6.7% | 17.9% | 2.0% |
+| 1:20 (สัดส่วนจริง) | 0.9% | 5.0% | 13.4% | 0.7% |
+
+ที่ 1:5 ถนนบนเขาชันเกิน 50% ซึ่งรถขึ้นไม่ไหว ส่วนที่ 1:10 ดอยอินทนนท์ยังสูง 257 ม. ในเกม ดูเป็นภูเขาชัดเจน
+ถนนช่วงที่ยังชันเกิน 15% (ประมาณ 5%) ให้แก้ด้วยการปรับความชันพื้นตามแนวถนนใน Editor (Landscape Splines หรือเครื่องมือ Flatten)
+ถ้าต้องการโลกที่ราบกว่านี้ ให้เปลี่ยน `vertical_scale` ใน `geo_config.json` และ `VerticalScale` ใน `DefaultGame.ini` ให้ตรงกัน แล้วสร้าง Heightmap ใหม่
+
+### 11.2 สร้างข้อมูล (ทำครั้งเดียว)
+```powershell
+cd Tools\GeoPipeline
+pip install rasterio Pillow
+python build_roads.py --input raw\roads.parquet --area TH-50,TH-51,TH-52 --name North3
+python build_heightmap.py --area TH-50,TH-51,TH-52 --name North3 --download --roads ..\..\Content\_Downtown\Data\Roads\Roads_North3.json
+```
+- ดาวน์โหลด DEM 16 แผ่น (ประมาณ 700 MB ครั้งแรก) ใช้เวลารวมประมาณ 1 นาที
+- ผลลัพธ์อยู่ใน `raw/heightmaps/`: `North3_heightmap.r16`, ไฟล์ค่าตั้งค่า `North3_landscape.json` และภาพตรวจ `North3_preview.png`
+- `Roads_North3.json` (ถนน 290 ชิ้น, ป้ายข้ามเขต 36 จุด) อยู่ใน repo แล้ว
+
+ตรวจความถูกต้องแล้ว: อ่านค่าความสูงกลับจากไฟล์ `.r16` ด้วยการแปลงแกนแบบเดียวกับ Unreal ได้ดังนี้
+
+| จุด | สูงจริง | ใน Heightmap |
+|---|---|---|
+| ยอดดอยอินทนนท์ | 2,565 ม. | 2,569 ม. |
+| วัดพระธาตุดอยสุเทพ | 1,056 ม. | 1,051 ม. |
+| เมืองเก่าเชียงใหม่ | ~305 ม. | 313 ม. |
+| ตัวเมืองลำปาง | ~240 ม. | 238 ม. |
+| ตัวเมืองลำพูน | ~295 ม. | 295 ม. |
+
+### 11.3 Import ใน Editor
+1. File → New Level → Open World → Save เป็น `Content/_Downtown/Maps/L_Test_North`
+2. ลบ Landscape เดิม → Landscape Mode → **New → Import from File** → เลือก `North3_heightmap.r16` แล้วใส่ค่าตามที่สคริปต์พิมพ์:
+
+| ช่อง | ค่า |
+|---|---|
+| Location | X = 2,307,765  Y = −1,852,321  Z = 12,905.36 |
+| Scale | X = 422  Y = 422  Z = 51.74 |
+| Section Size / Sections per Component | 63×63 quads / 2×2 |
+| Number of Components / Overall Resolution | 32×32 / 4033×4033 (กว้าง 17.02 กม. ในเกม) |
+
+   ค่าเหล่านี้ทำให้ระดับน้ำทะเลอยู่ที่ Z = 0 พอดี จึงใช้ร่วมกับ `UDTGeoLibrary::ElevationToWorldZ` ได้
+3. **World Partition** → Convert/สร้าง Landscape Streaming Proxies (ปกติขั้นตอน import ทำให้อัตโนมัติใน Open World map)
+4. วาง **DTGeoImporter**: RoadsFile = `_Downtown/Data/Roads/Roads_North3.json`, ZoneFilter = `TH-51` (ลำพูน เล็กสุด เหมาะทดสอบรอบแรก) → **Preview Zone** → **Validate Data** → **Import**
+   - ใน Log บรรทัด `Ground trace: N/N points hit the ground` ต้องเท่ากันทั้งสองค่า ถ้าไม่เท่ากัน แปลว่า Cell ของ Landscape ยังไม่โหลด ให้โหลด Region ก่อน
+5. PIE → `dt.Province.Teleport Lamphun` → ขับทางหลวงหมายเลข 11 ไปลำปาง แล้วดู `[Province] Entered TH-52 Lampang`
+
+### 11.4 สิ่งที่ต้องทดสอบในฉากนี้
+- รถขึ้นทางชันระดับ 99% ได้ไหม (ประมาณ 27% ที่ 1:10) ถ้าไม่ได้ ให้เพิ่ม Torque ใน `BP_Vehicle_Sedan` หรือปรับความชันตามแนวถนน
+- Streaming ของ Landscape ขนาด 17 กม. ตอนขับเร็ว (`stat streaming`, `wp.Runtime.ToggleDrawRuntimeHash2D`)
+- ระยะมองเห็นภูเขาไกลๆ ต้องสร้าง HLOD ของ Landscape ไม่อย่างนั้นภูเขาที่อยู่นอก Loading Range จะหายไป
+
+## 12. Roadmap ไปให้ครบ 77 จังหวัด
+
+1. ~~ฉากทดสอบ 2 (ภูเขา)~~ → Pipeline พร้อมแล้ว ดูข้อ 11 (เหลือ import ใน Editor และขับทดสอบ)
 2. **Heightmap ทั้งประเทศ:** แบ่ง Landscape ตามภาค ความละเอียด 4–8 ม./quad (ทั้งประเทศ ~83 × 44 กม.) แล้วใช้ PCG เติมรายละเอียด
 3. **ชายฝั่งและทะเล:** ใช้ OSM land polygon ตัดขอบ Landscape และวาง Water Body (Ocean)
 4. **ทางหลวงทั้งประเทศ:** `build_roads.py --area <ภาค>` ทีละภาค (motorway/trunk ทั้งประเทศ แล้วเพิ่ม primary เฉพาะเส้นที่จำเป็น)

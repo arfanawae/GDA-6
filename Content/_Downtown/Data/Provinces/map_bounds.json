@@ -3,7 +3,7 @@
     "origin_lat": 13.0,
     "origin_lon": 101.0,
     "horizontal_scale": 20.0,
-    "vertical_scale": 5.0
+    "vertical_scale": 10.0
   },
   "country": {
     "MinX": -4107064,
@@ -25,12 +25,5 @@
     "MaxY": -25823,
     "SizeXKm": 4.35,
     "SizeYKm": 3.72
-  },
-  "minimap": {
-    "image": "T_Minimap_TestArea.png",
-    "MinX": 274714,
-    "MinY": -397901,
-    "MaxX": 709466,
-    "MaxY": -26034
   }
 }

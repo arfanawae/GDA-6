@@ -9,6 +9,10 @@ Sources:
 - Province boundaries: geoBoundaries `THA ADM1` (gbOpen, built from OSM / Wambacher, ODbL 1.0) — https://www.geoboundaries.org
 - Roads: Humanitarian OpenStreetMap Team export "Thailand Roads (OpenStreetMap Export)" via HDX (ODbL 1.0) — https://data.humdata.org/dataset/hotosm_tha_roads
 
+Terrain heights (generated locally by `Tools/GeoPipeline/build_heightmap.py`, not stored in the repo):
+- Copernicus DEM GLO-30, © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018, provided under
+  COPERNICUS by the European Union and ESA. Free to use, including commercially, with this attribution.
+
 What this means for the game:
 - The shipped game must credit "© OpenStreetMap contributors" (credits screen + store page is the usual practice).
 - These derived *databases* (the JSON files) stay under ODbL: if you distribute them, share them under ODbL too.
