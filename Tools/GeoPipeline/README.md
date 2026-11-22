@@ -7,9 +7,46 @@ Background and design decisions: [`Docs/ThailandMap.md`](../../Docs/ThailandMap.
 ```bash
 cd Tools/GeoPipeline
 python -m venv .venv && . .venv/bin/activate      # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
+pip install -r requirements.txt      # Windows: see 'Windows (PowerShell)' below
 mkdir -p raw
 ```
+
+## Step 0 — clean & split raw data: `prepare_geodata.py`
+
+Reads every `.geojson/.json/.shp/.csv` in a folder, keeps only the fields the game needs, repairs/drops
+bad geometry (nulls, NaN, swapped lat/lon, out-of-Thailand, invalid polygons), reprojects UTM data,
+and writes one GeoJSON per zone with a before/after size report. Its output feeds the build scripts below.
+Data assumptions are listed at the top of the script.
+
+### Windows (PowerShell) — quick start
+```powershell
+# 1) once: install Python 3.11+ from python.org (tick "Add python.exe to PATH"), then in the repo folder:
+cd Tools\GeoPipeline
+py -m venv .venv
+.\.venv\Scripts\Activate.ps1          # if blocked: Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+pip install shapely numpy pyshp pyproj
+
+# 2) put source files in Tools\GeoPipeline\raw\  (.geojson / .shp+.shx+.dbf(+.prj/.cpg) / .csv)
+
+# 3) run
+python prepare_geodata.py --list-zones
+python prepare_geodata.py --input raw --output prepared --zone bangkok-metro
+python prepare_geodata.py --input raw --output prepared --zone TH-50 --clip
+python prepare_geodata.py --input raw\tha_adm1.geojson --output prepared --zone each
+```
+(cmd.exe: use `.venv\Scripts\activate.bat` instead of `Activate.ps1`.)
+
+| Option | Meaning |
+|---|---|
+| `--zone` | `all`, `each` (77 files), `bangkok-metro`, `test-area`, `north` … `south`, or codes/names: `TH-50`, `เชียงใหม่,Lamphun` |
+| `--classes` | road classes to keep (default `motorway,trunk,primary`, links added); `all` keeps everything |
+| `--boundaries` | province polygons for assigning/clipping roads & points (default: a province file found in `--input`) |
+| `--clip` | cut roads/points exactly at the zone border |
+| `--simplify-m` | simplify tolerance in real metres (0 = off) |
+| `--precision` | decimals kept in coordinates (6 ≈ 0.1 m) |
+
+Output: `prepared/<provinces|roads|points>/<zone>.geojson` + `prepared/_summary.csv`.
+Tested on the full HOT/HDX roads shapefile (2.94 M lines, 6.9 GB → 13,840 lines / 5 MB for `bangkok-metro`, 15 s, ~0.4 GB RAM).
 
 ## Download source data (one time, kept out of git)
 ```bash
@@ -44,6 +81,7 @@ python geo_projection.py
 | `build_provinces.py` | → `Content/_Downtown/Data/Provinces/DT_Provinces.json`, `provinces_summary.csv`, `map_bounds.json` |
 | `build_roads.py` | → `Content/_Downtown/Data/Roads/Roads_<name>.json` (roads + crossings). Also accepts GeoJSON or Overpass JSON |
 | `preview_area.py` | renders provinces + roads + crossings to a PNG |
+| `prepare_geodata.py` | step 0: clean/filter/split raw GeoJSON / Shapefile / CSV per province or zone |
 
 ## Changing the scale
 1. Edit `geo_config.json` **and** `Config/DefaultGame.ini`.

@@ -35,7 +35,7 @@ def load_meta() -> dict[str, dict]:
 
 def find_code(props: dict) -> str | None:
     """Accepts geoBoundaries (shapeISO 'TH-10') and OCHA/HDX (ADM1_PCODE 'TH10')."""
-    for key in ("shapeISO", "ISO", "iso_3166_2", "ADM1_PCODE", "ADM1_PCODE_"):
+    for key in ("code", "shapeISO", "ISO", "iso_3166_2", "ADM1_PCODE", "ADM1_PCODE_"):
         value = props.get(key)
         if value:
             value = str(value).upper()

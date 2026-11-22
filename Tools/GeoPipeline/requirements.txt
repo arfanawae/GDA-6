@@ -1,4 +1,6 @@
 shapely>=2.0
 numpy>=1.24
-pyarrow>=14      # only for the HDX GeoParquet road input
+pyshp>=2.3       # .shp input (prepare_geodata.py)
+pyproj>=3.6      # only for projected input (e.g. UTM 47N/48N government data)
+pyarrow>=14      # only for the HDX GeoParquet road input (build_roads.py)
 Pillow>=10       # only for --minimap / preview_area.py
