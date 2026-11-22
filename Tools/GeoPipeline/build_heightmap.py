@@ -5,6 +5,15 @@ Usage:
   python build_heightmap.py --area TH-50,TH-51,TH-52 --name North3 --download
   python build_heightmap.py --area test-area --name TestArea --download --max-quad-m 2
   python build_heightmap.py --area TH-50,TH-51,TH-52 --name North3 --roads ../../Content/_Downtown/Data/Roads/Roads_North3.json
+  python build_heightmap.py --area TH-50,TH-51,TH-52 --name North3 --roads ...Roads_North3.json --flatten-roads
+  python build_heightmap.py --area TH-82,TH-83 --name Phuket --download --sea
+
+Options:
+  --flatten-roads   carve smooth, grade-limited beds (default max 12 % in game) for every ground-level road
+                    in --roads and blend them into the terrain; prints gradients before/after
+  --sea             vertices outside Thailand's land (and below 1 m elsewhere) become seabed sloping down
+                    from the coast; low coastal land is lifted just above Z 0; writes
+                    Content/_Downtown/Data/Coast/Coast_<name>.json (coastline splines for ADTGeoImporter)
 
 Outputs (default raw/heightmaps/, keep out of git):
   <name>_heightmap.r16 / .png   16-bit heightmap for Landscape Mode > Import from File
@@ -46,6 +55,11 @@ except ImportError:
     sys.exit("[ERROR] Missing package Pillow:  pip install Pillow")
 
 from geo_projection import EARTH_RADIUS_M, GeoConfig
+
+try:
+    import terrain_ops
+except ImportError as exc:  # shapely missing
+    sys.exit(f"[ERROR] {exc}.  pip install shapely")
 
 HERE = Path(__file__).resolve().parent
 PROJECT = HERE.parents[1]
@@ -179,11 +193,25 @@ def main() -> None:
     parser.add_argument("--roads", type=Path, help="Roads_<name>.json: report road gradients in game")
     parser.add_argument("--min-height-m", type=float, default=0.0,
                         help="clamp heights below this (real m). Copernicus is a surface model: water edges can be negative")
+    g = parser.add_argument_group("road beds (--flatten-roads, needs --roads)")
+    g.add_argument("--flatten-roads", action="store_true")
+    g.add_argument("--max-grade-pct", type=float, default=12.0, help="max road gradient in GAME units")
+    g.add_argument("--road-smooth-m", type=float, default=30.0, help="profile smoothing window (game m)")
+    g.add_argument("--road-shoulder-m", type=float, default=3.0, help="flat shoulder beside the lanes (game m)")
+    g.add_argument("--road-falloff-m", type=float, default=15.0, help="blend from road bed to terrain (game m)")
+    s = parser.add_argument_group("sea (--sea)")
+    s.add_argument("--sea", action="store_true")
+    s.add_argument("--sea-max-depth-m", type=float, default=10.0, help="deepest seabed (game m)")
+    s.add_argument("--sea-shore-depth-m", type=float, default=0.5, help="seabed depth right at the coast (game m)")
+    s.add_argument("--sea-slope-pct", type=float, default=3.0, help="seabed slope away from the coast")
+    s.add_argument("--land-min-m", type=float, default=0.3, help="lift coastal land to at least this Z (game m)")
     args = parser.parse_args()
 
     cfg = GeoConfig.load()
     if args.vertical_scale:
         cfg = GeoConfig(cfg.origin_lat, cfg.origin_lon, cfg.horizontal_scale, args.vertical_scale)
+    if args.flatten_roads and not args.roads:
+        sys.exit("[ERROR] --flatten-roads needs --roads Roads_<name>.json")
     if not PROVINCES.is_file():
         sys.exit(f"[ERROR] {PROVINCES} not found - run build_provinces.py first")
     rows = json.loads(PROVINCES.read_text(encoding="utf-8"))
@@ -222,8 +250,49 @@ def main() -> None:
     height_m = sample_bilinear(dem, transform, lat, lon) if dem is not None else np.zeros_like(lat, dtype=np.float32)
     height_m = np.maximum(height_m, args.min_height_m)
 
-    # --- encode for Unreal -------------------------------------------------------------------------
     z_cm = height_m.astype(np.float64) * 100.0 / cfg.vertical_scale
+    grid = (loc_x, loc_y, quad_cm)
+    extra: dict = {}
+
+    # --- sea + coastline ----------------------------------------------------------------------------
+    if args.sea:
+        in_grid = [r for r in rows if any(loc_x - 1e5 <= p["X"] <= loc_x + size_cm + 1e5 and loc_y - 1e5 <= p["Y"] <= loc_y + size_cm + 1e5
+                                          for ring in r["Rings"] for p in ring["Points"][::10])]
+        land = terrain_ops.land_mask(in_grid, grid, verts, height_m)
+        extra["sea"] = terrain_ops.apply_sea(z_cm, land, quad_cm, args.sea_shore_depth_m * 100, args.sea_slope_pct / 100,
+                                             args.sea_max_depth_m * 100, args.land_min_m * 100)
+        lines = terrain_ops.coastline(in_grid, land, grid, simplify_cm=max(100.0, quad_cm / 2))
+        coast_dir = PROJECT / "Content" / "_Downtown" / "Data" / "Coast"
+        coast_dir.mkdir(parents=True, exist_ok=True)
+        coast_path = coast_dir / f"Coast_{args.name}.json"
+        coast_path.write_text(json.dumps({"config": cfg.__dict__, "area": codes, "sea_level_z": 0, "lines": lines},
+                                         separators=(",", ":")), encoding="utf-8")
+        extra["coast"] = {"file": str(coast_path.relative_to(PROJECT)), "lines": len(lines),
+                          "islands": sum(1 for line in lines if line["closed"]),
+                          "length_km_game": round(sum(line["length_km"] for line in lines), 1)}
+        print(f"sea: {extra['sea']['sea_vertices_pct']}% of the landscape is sea, seabed {args.sea_shore_depth_m}..{args.sea_max_depth_m} m below Z 0; "
+              f"{extra['coast']['lines']} coastline pieces ({extra['coast']['islands']} islands, {extra['coast']['length_km_game']} km) -> {coast_path.name}")
+
+    # --- road beds -----------------------------------------------------------------------------------
+    if args.flatten_roads:
+        road_list = json.loads(args.roads.read_text(encoding="utf-8")).get("roads", [])
+        step = 1000.0  # 10 m game
+        before = terrain_ops.road_grades(z_cm, grid, road_list, step)
+        stats = terrain_ops.flatten_roads(z_cm, grid, road_list, args.max_grade_pct / 100, args.road_smooth_m * 100,
+                                          args.road_shoulder_m * 100, args.road_falloff_m * 100)
+        after = terrain_ops.road_grades(z_cm, grid, road_list, step)
+        extra["road_beds"] = {"settings": {"max_grade_pct": args.max_grade_pct, "smooth_m": args.road_smooth_m,
+                                           "shoulder_m": args.road_shoulder_m, "falloff_m": args.road_falloff_m},
+                              "stats": stats, "grades_before": before, "grades_after": after}
+        print(f"\nroad beds on {stats.get('roads', 0)} roads ({before.get('km_game', 0)} km game), max grade {args.max_grade_pct:g}%:")
+        for label, gr in (("before", before), ("after ", after)):
+            if gr:
+                print(f"  {label}  p50 {gr['p50']:5.1f}%  p90 {gr['p90']:5.1f}%  p99 {gr['p99']:5.1f}%  max {gr['max']:5.1f}%  "
+                      f">15%: {gr['share_over_15pct']:5.2f}%  >20%: {gr['share_over_20pct']:5.2f}%")
+        print(f"  earthworks: max cut {stats.get('max_cut_cm', 0)/100:.1f} m, max fill {stats.get('max_fill_cm', 0)/100:.1f} m, "
+              f"99% of the road bed within {stats.get('p99_abs_change_cm', 0)/100:.1f} m of the original terrain (game m)")
+
+    # --- encode for Unreal -------------------------------------------------------------------------
     z_min, z_max = float(z_cm.min()), float(z_cm.max())
     # 16-bit range: keep ~1000 steps of headroom below/above for sculpting
     z_scale = max(1.0, math.ceil((z_max - z_min + 1.0) * 128.0 / 63535.0 * 100.0) / 100.0)
@@ -249,6 +318,7 @@ def main() -> None:
             "SectionSize": f"{qps}x{qps} quads", "SectionsPerComponent": f"{spc}x{spc}",
             "NumberOfComponents": f"{comps}x{comps}", "OverallResolution": f"{verts}x{verts}",
         },
+        **extra,
         "heights": {"real_min_m": round(float(height_m.min()), 1), "real_max_m": round(float(height_m.max()), 1),
                     "game_min_cm": round(z_min), "game_max_cm": round(z_max), "max_encoding_error_cm": round(max_err_cm, 2)},
     }
@@ -258,7 +328,7 @@ def main() -> None:
         settings["road_gradients"] = road_gradients(args.roads, dem, transform, cfg)
 
     (args.out_dir / f"{args.name}_landscape.json").write_text(json.dumps(settings, indent=2, ensure_ascii=False), encoding="utf-8")
-    preview(args.out_dir / f"{args.name}_preview.png", height_m, sel, (loc_x, loc_y, quad_cm), args.roads)
+    preview(args.out_dir / f"{args.name}_preview.png", z_cm, sel, (loc_x, loc_y, quad_cm), args.roads)
 
     L = settings["landscape"]
     print(f"real height {settings['heights']['real_min_m']} .. {settings['heights']['real_max_m']} m "
@@ -328,6 +398,10 @@ def preview(path: Path, height_m: np.ndarray, provinces: list[dict], grid, roads
     shade = np.clip(0.6 + (dx - dy) / (np.percentile(np.abs(dx) + np.abs(dy), 99) + 1e-6) * 0.4, 0, 1)
     hn = (h - h.min()) / (np.ptp(h) + 1e-6)
     rgb = np.stack([0.35 + 0.5 * hn, 0.55 + 0.25 * hn, 0.35 + 0.35 * hn], axis=-1) * shade[..., None]
+    sea = h < 0
+    if sea.any():  # seabed in blue, darker with depth
+        depth = np.clip(-h / (np.abs(h[sea]).max() + 1e-6), 0, 1)
+        rgb[sea] = np.stack([0.20 - 0.1 * depth, 0.40 - 0.15 * depth, 0.65 - 0.1 * depth], axis=-1)[sea]
     img = Image.fromarray((np.clip(rgb, 0, 1) * 255).astype(np.uint8))
     n = h.shape[0]
     scale = 1024 / n

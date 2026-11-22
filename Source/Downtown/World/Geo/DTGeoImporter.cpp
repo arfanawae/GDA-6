@@ -2,6 +2,7 @@
 #include "World/Geo/DTGeoRoad.h"
 #include "World/Geo/DTGeoSettings.h"
 #include "World/Geo/DTGeoLibrary.h"
+#include "World/Geo/DTGeoCoastline.h"
 #include "World/Province/DTProvinceSign.h"
 #include "AI/Traffic/DTTrafficLane.h"
 #include "Downtown.h"
@@ -72,6 +73,7 @@ ADTGeoImporter::ADTGeoImporter()
 	RoadClass = ADTGeoRoad::StaticClass();
 	LaneClass = ADTTrafficLane::StaticClass();
 	SignClass = ADTProvinceSign::StaticClass();
+	CoastClass = ADTGeoCoastline::StaticClass();
 }
 
 // ---------------------------------------------------------------------------------------------------------------- buttons
@@ -114,7 +116,7 @@ int32 ADTGeoImporter::ClearByTag(FName Tag, const TCHAR* What)
 		return 0;
 	}
 
-	int32 Roads = 0, Lanes = 0, Signs = 0, Other = 0;
+	int32 Roads = 0, Lanes = 0, Signs = 0, Coast = 0, Other = 0;
 	TArray<AActor*> ToRemove;
 	for (TActorIterator<AActor> It(World); It; ++It)
 	{
@@ -128,6 +130,7 @@ int32 ADTGeoImporter::ClearByTag(FName Tag, const TCHAR* What)
 		if (Actor->IsA<ADTGeoRoad>()) { ++Roads; }
 		else if (Actor->IsA<ADTTrafficLane>()) { ++Lanes; }
 		else if (Actor->IsA<ADTProvinceSign>()) { ++Signs; }
+		else if (Actor->IsA<ADTGeoCoastline>()) { ++Coast; }
 		else { ++Other; }
 #if WITH_EDITOR
 		Actor->Modify();
@@ -135,8 +138,8 @@ int32 ADTGeoImporter::ClearByTag(FName Tag, const TCHAR* What)
 		Actor->Destroy();
 	}
 
-	UE_LOG(LogDTGeo, Display, TEXT("[GeoImport] Cleared %s: %d actors (%d road pieces, %d traffic lanes, %d signs, %d other)."),
-		What, ToRemove.Num(), Roads, Lanes, Signs, Other);
+	UE_LOG(LogDTGeo, Display, TEXT("[GeoImport] Cleared %s: %d actors (%d road pieces, %d traffic lanes, %d signs, %d coastline, %d other)."),
+		What, ToRemove.Num(), Roads, Lanes, Signs, Coast, Other);
 	if (ToRemove.Num() == 0)
 	{
 		UE_LOG(LogDTGeo, Display, TEXT("[GeoImport]   Nothing matched tag %s. In World Partition only actors in LOADED cells are found - load the region first."), *Tag.ToString());
@@ -349,6 +352,106 @@ bool ADTGeoImporter::ParseRoad(const TSharedPtr<FJsonValue>& Value, FRoadData& O
 	return true;
 }
 
+bool ADTGeoImporter::ParsePoint2D(const TSharedPtr<FJsonValue>& Value, FVector2D& Out)
+{
+	const TArray<TSharedPtr<FJsonValue>>* Coords = nullptr;
+	double X = 0.0, Y = 0.0;
+	if (Value.IsValid() && Value->TryGetArray(Coords) && Coords && Coords->Num() >= 2
+		&& (*Coords)[0].IsValid() && (*Coords)[0]->TryGetNumber(X)
+		&& (*Coords)[1].IsValid() && (*Coords)[1]->TryGetNumber(Y)
+		&& FMath::IsFinite(X) && FMath::IsFinite(Y)
+		&& FMath::Abs(X) < FDTProvinceGeometry::MaxAbsCoordinateCm && FMath::Abs(Y) < FDTProvinceGeometry::MaxAbsCoordinateCm)
+	{
+		Out = FVector2D(X, Y);
+		return true;
+	}
+	return false;
+}
+
+bool ADTGeoImporter::LoadGeoFile(const FString& RelativePath, const TCHAR* Kind, const TArray<FName>& ZoneCodes, bool bAll, TSharedPtr<FJsonObject>& OutRoot) const
+{
+	const UDTGeoSettings* Settings = GetDefault<UDTGeoSettings>();
+	const FString Path = FPaths::ConvertRelativePathToFull(FPaths::Combine(FPaths::ProjectContentDir(), RelativePath));
+	const int64 FileSize = IFileManager::Get().FileSize(*Path);
+	UE_LOG(LogDTGeo, Display, TEXT("[GeoImport] Reading %s file %s (%s)"), Kind, *Path, FileSize >= 0 ? *FString::Printf(TEXT("%.1f KB"), FileSize / 1024.0) : TEXT("not found"));
+
+	FString Json;
+	if (FileSize < 0 || !FFileHelper::LoadFileToString(Json, *Path))
+	{
+		UE_LOG(LogDTGeo, Error, TEXT("[GeoImport] Aborted: cannot read the %s file. Paths are relative to Content/, e.g. _Downtown/Data/Roads/Roads_TestArea.json"), Kind);
+		return false;
+	}
+	if (!FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Json), OutRoot) || !OutRoot.IsValid())
+	{
+		UE_LOG(LogDTGeo, Error, TEXT("[GeoImport] Aborted: %s is not valid JSON. Re-run the Tools/GeoPipeline script that made it."), *RelativePath);
+		return false;
+	}
+
+	// Projection sanity check: the file must have been generated with the same settings.
+	const TSharedPtr<FJsonObject>* Config = nullptr;
+	if (OutRoot->TryGetObjectField(TEXT("config"), Config) && Config && Config->IsValid())
+	{
+		double FileScale = 0.0, FileLat = 0.0, FileLon = 0.0, FileVertical = 0.0;
+		(*Config)->TryGetNumberField(TEXT("horizontal_scale"), FileScale);
+		(*Config)->TryGetNumberField(TEXT("origin_lat"), FileLat);
+		(*Config)->TryGetNumberField(TEXT("origin_lon"), FileLon);
+		(*Config)->TryGetNumberField(TEXT("vertical_scale"), FileVertical);
+		UE_LOG(LogDTGeo, Display, TEXT("[GeoImport] %s projection: origin %.4f N %.4f E, 1:%.0f, vertical 1:%.0f"), Kind, FileLat, FileLon, FileScale, FileVertical);
+		if (!FMath::IsNearlyEqual(FileScale, Settings->HorizontalScale) || !FMath::IsNearlyEqual(FileLat, Settings->OriginLat) || !FMath::IsNearlyEqual(FileLon, Settings->OriginLon))
+		{
+			UE_LOG(LogDTGeo, Error, TEXT("[GeoImport] Aborted: projection mismatch - file 1:%.1f origin (%.3f, %.3f) vs Project Settings 1:%.1f (%.3f, %.3f). Re-run the pipeline or fix Project Settings > Game > Downtown Geo."),
+				FileScale, FileLat, FileLon, Settings->HorizontalScale, Settings->OriginLat, Settings->OriginLon);
+			return false;
+		}
+		if (FileVertical > 0.0 && !FMath::IsNearlyEqual(FileVertical, Settings->VerticalScale))
+		{
+			UE_LOG(LogDTGeo, Warning, TEXT("[GeoImport] %s file was built with vertical 1:%.0f but Project Settings use 1:%.0f (heights/heightmaps may not match)."), Kind, FileVertical, Settings->VerticalScale);
+		}
+	}
+	else
+	{
+		UE_LOG(LogDTGeo, Warning, TEXT("[GeoImport] %s file has no 'config' block - cannot verify it was built with the same scale/origin."), Kind);
+	}
+
+	// Which provinces does the file cover? Warn early if the zone is outside it.
+	const TArray<TSharedPtr<FJsonValue>>* AreaValues = nullptr;
+	if (OutRoot->TryGetArrayField(TEXT("area"), AreaValues) && AreaValues)
+	{
+		TArray<FName> FileArea;
+		for (const TSharedPtr<FJsonValue>& V : *AreaValues)
+		{
+			FString Code;
+			if (V.IsValid() && V->TryGetString(Code))
+			{
+				FileArea.Add(FName(*Code));
+			}
+		}
+		UE_LOG(LogDTGeo, Display, TEXT("[GeoImport] %s file covers: %s"), Kind, *DTGeoImport::JoinCodes(FileArea));
+		if (!bAll)
+		{
+			TArray<FName> NotCovered;
+			for (const FName& Code : ZoneCodes)
+			{
+				if (!FileArea.Contains(Code))
+				{
+					NotCovered.Add(Code);
+				}
+			}
+			if (NotCovered.Num() == ZoneCodes.Num() && ZoneCodes.Num() > 0)
+			{
+				UE_LOG(LogDTGeo, Error, TEXT("[GeoImport] Aborted: none of the zone's provinces are in the %s file. Build one with --area %s"),
+					Kind, *DTGeoImport::JoinCodes(ZoneCodes, 77).Replace(TEXT(" "), TEXT("")));
+				return false;
+			}
+			if (NotCovered.Num() > 0)
+			{
+				UE_LOG(LogDTGeo, Warning, TEXT("[GeoImport] Zone provinces NOT in the %s file (nothing will appear there): %s"), Kind, *DTGeoImport::JoinCodes(NotCovered));
+			}
+		}
+	}
+	return true;
+}
+
 template <typename T>
 T* ADTGeoImporter::SpawnTagged(TSubclassOf<T> Class, const FVector& Location, const FRotator& Rotation, const FString& Folder, const TArray<FName>& ExtraTags)
 {
@@ -549,90 +652,37 @@ void ADTGeoImporter::RunImport(bool bSpawn)
 		return !Hint.IsNone();
 	};
 
-	// --- File --------------------------------------------------------------------------------------------------
-	const FString Path = FPaths::ConvertRelativePathToFull(FPaths::Combine(FPaths::ProjectContentDir(), RoadsFile));
-	const int64 FileSize = IFileManager::Get().FileSize(*Path);
-	UE_LOG(LogDTGeo, Display, TEXT("[GeoImport] Reading %s (%s)"), *Path, FileSize >= 0 ? *FString::Printf(TEXT("%.1f KB"), FileSize / 1024.0) : TEXT("not found"));
-
-	FString Json;
-	if (FileSize < 0 || !FFileHelper::LoadFileToString(Json, *Path))
+	// --- Files -------------------------------------------------------------------------------------------------
+	const bool bUseRoadsFile = !RoadsFile.TrimStartAndEnd().IsEmpty() && (bImportRoads || bImportTrafficLanes || bImportSigns);
+	const bool bUseCoastFile = bImportCoast && !CoastFile.TrimStartAndEnd().IsEmpty();
+	if (!bUseRoadsFile && !bUseCoastFile)
 	{
-		UE_LOG(LogDTGeo, Error, TEXT("[GeoImport] Aborted: cannot read the file. RoadsFile is relative to Content/, e.g. _Downtown/Data/Roads/Roads_TestArea.json"));
+		UE_LOG(LogDTGeo, Error, TEXT("[GeoImport] Aborted: nothing to import - set RoadsFile and/or CoastFile."));
 		return;
 	}
+
 	TSharedPtr<FJsonObject> Root;
-	if (!FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Json), Root) || !Root.IsValid())
+	TSharedPtr<FJsonObject> CoastRoot;
+	if (bUseRoadsFile && !LoadGeoFile(RoadsFile, TEXT("roads"), ZoneCodes, bAll, Root))
 	{
-		UE_LOG(LogDTGeo, Error, TEXT("[GeoImport] Aborted: %s is not valid JSON. Re-run Tools/GeoPipeline/build_roads.py."), *RoadsFile);
 		return;
 	}
-
-	// Projection sanity check: the file must have been generated with the same settings.
-	const TSharedPtr<FJsonObject>* Config = nullptr;
-	if (Root->TryGetObjectField(TEXT("config"), Config) && Config && Config->IsValid())
+	if (bUseCoastFile && !LoadGeoFile(CoastFile, TEXT("coast"), ZoneCodes, bAll, CoastRoot))
 	{
-		double FileScale = 0.0, FileLat = 0.0, FileLon = 0.0;
-		(*Config)->TryGetNumberField(TEXT("horizontal_scale"), FileScale);
-		(*Config)->TryGetNumberField(TEXT("origin_lat"), FileLat);
-		(*Config)->TryGetNumberField(TEXT("origin_lon"), FileLon);
-		UE_LOG(LogDTGeo, Display, TEXT("[GeoImport] File projection: origin %.4f N %.4f E, 1:%.0f"), FileLat, FileLon, FileScale);
-		if (!FMath::IsNearlyEqual(FileScale, Settings->HorizontalScale) || !FMath::IsNearlyEqual(FileLat, Settings->OriginLat) || !FMath::IsNearlyEqual(FileLon, Settings->OriginLon))
-		{
-			UE_LOG(LogDTGeo, Error, TEXT("[GeoImport] Aborted: projection mismatch - file 1:%.1f origin (%.3f, %.3f) vs Project Settings 1:%.1f (%.3f, %.3f). Re-run the pipeline or fix Project Settings > Game > Downtown Geo."),
-				FileScale, FileLat, FileLon, Settings->HorizontalScale, Settings->OriginLat, Settings->OriginLon);
-			return;
-		}
-	}
-	else
-	{
-		UE_LOG(LogDTGeo, Warning, TEXT("[GeoImport] File has no 'config' block - cannot verify it was built with the same scale/origin."));
-	}
-
-	// Which provinces does the file cover? Warn early if the zone is outside it.
-	const TArray<TSharedPtr<FJsonValue>>* AreaValues = nullptr;
-	if (Root->TryGetArrayField(TEXT("area"), AreaValues) && AreaValues)
-	{
-		TArray<FName> FileArea;
-		for (const TSharedPtr<FJsonValue>& V : *AreaValues)
-		{
-			FString Code;
-			if (V.IsValid() && V->TryGetString(Code))
-			{
-				FileArea.Add(FName(*Code));
-			}
-		}
-		UE_LOG(LogDTGeo, Display, TEXT("[GeoImport] File covers: %s"), *DTGeoImport::JoinCodes(FileArea));
-		if (!bAll)
-		{
-			TArray<FName> NotCovered;
-			for (const FName& Code : ZoneCodes)
-			{
-				if (!FileArea.Contains(Code))
-				{
-					NotCovered.Add(Code);
-				}
-			}
-			if (NotCovered.Num() == ZoneCodes.Num() && ZoneCodes.Num() > 0)
-			{
-				UE_LOG(LogDTGeo, Error, TEXT("[GeoImport] Aborted: none of the zone's provinces are in this file. Build one with: python build_roads.py --area %s --name <Name>"),
-					*DTGeoImport::JoinCodes(ZoneCodes, 77).Replace(TEXT(" "), TEXT("")));
-				return;
-			}
-			if (NotCovered.Num() > 0)
-			{
-				UE_LOG(LogDTGeo, Warning, TEXT("[GeoImport] Zone provinces NOT in this file (no roads will appear there): %s"), *DTGeoImport::JoinCodes(NotCovered));
-			}
-		}
+		return;
 	}
 
 	const TArray<TSharedPtr<FJsonValue>>* RoadValues = nullptr;
 	const TArray<TSharedPtr<FJsonValue>>* CrossingValues = nullptr;
-	Root->TryGetArrayField(TEXT("roads"), RoadValues);
-	Root->TryGetArrayField(TEXT("crossings"), CrossingValues);
-	if (!RoadValues && !CrossingValues)
+	if (Root.IsValid())
 	{
-		UE_LOG(LogDTGeo, Error, TEXT("[GeoImport] Aborted: the file has neither 'roads' nor 'crossings'."));
-		return;
+		Root->TryGetArrayField(TEXT("roads"), RoadValues);
+		Root->TryGetArrayField(TEXT("crossings"), CrossingValues);
+		if (!RoadValues && !CrossingValues)
+		{
+			UE_LOG(LogDTGeo, Error, TEXT("[GeoImport] Aborted: %s has neither 'roads' nor 'crossings'."), *RoadsFile);
+			return;
+		}
 	}
 
 	// --- Clear previous results ----------------------------------------------------------------------------------
@@ -867,6 +917,82 @@ void ADTGeoImporter::RunImport(bool bSpawn)
 		}
 	}
 
+	// --- Coastline -----------------------------------------------------------------------------------------------
+	if (CoastRoot.IsValid())
+	{
+		double SeaLevel = 0.0;
+		CoastRoot->TryGetNumberField(TEXT("sea_level_z"), SeaLevel);
+		const TArray<TSharedPtr<FJsonValue>>* Lines = nullptr;
+		if (!CoastRoot->TryGetArrayField(TEXT("lines"), Lines) || !Lines)
+		{
+			Warn(Stats, FString::Printf(TEXT("coast file %s has no 'lines' array"), *CoastFile));
+		}
+		else
+		{
+			const FBox2D ZoneBox = bAll ? FBox2D(ForceInit) : Geometry.GetBounds(ZoneCodes).ExpandBy(50000.0);
+			Stats.CoastLinesInFile = Lines->Num();
+			for (int32 Index = 0; Index < Lines->Num(); ++Index)
+			{
+				const TSharedPtr<FJsonObject>* LinePtr = nullptr;
+				const TArray<TSharedPtr<FJsonValue>>* PointValues = nullptr;
+				if (!(*Lines)[Index].IsValid() || !(*Lines)[Index]->TryGetObject(LinePtr) || !LinePtr || !LinePtr->IsValid()
+					|| !(*LinePtr)->TryGetArrayField(TEXT("points"), PointValues) || !PointValues)
+				{
+					++Stats.CoastLinesMalformed;
+					Warn(Stats, FString::Printf(TEXT("coast line #%d skipped: not an object with 'points'"), Index));
+					continue;
+				}
+				bool bClosed = false;
+				(*LinePtr)->TryGetBoolField(TEXT("closed"), bClosed);
+
+				TArray<FVector> Points;
+				bool bTouchesZone = bAll;
+				int32 BadPoints = 0;
+				for (const TSharedPtr<FJsonValue>& PV : *PointValues)
+				{
+					FVector2D P;
+					if (!ParsePoint2D(PV, P))
+					{
+						++BadPoints;
+						continue;
+					}
+					bTouchesZone = bTouchesZone || ZoneBox.IsInside(P);
+					Points.Add(FVector(P.X, P.Y, SeaLevel + static_cast<double>(CoastZOffsetCm)));
+				}
+				Stats.PointsInvalid += BadPoints;
+				if (Points.Num() < 2)
+				{
+					++Stats.CoastLinesMalformed;
+					Warn(Stats, FString::Printf(TEXT("coast line #%d skipped: fewer than 2 valid points (%d invalid)"), Index, BadPoints));
+					continue;
+				}
+				if (!bTouchesZone)
+				{
+					++Stats.CoastLinesOutsideZone;
+					continue;
+				}
+
+				const TArray<TArray<FVector>> Pieces = SplitByLength(Points, MaxRoadPieceCm);
+				for (const TArray<FVector>& Piece : Pieces)
+				{
+					for (const FVector& P : Piece)
+					{
+						Stats.Bounds += P;
+					}
+					++Stats.CoastPieces;
+					if (!bSpawn)
+					{
+						continue;
+					}
+					if (ADTGeoCoastline* Coast = SpawnTagged<ADTGeoCoastline>(CoastClass, Piece[0], FRotator::ZeroRotator, TEXT("Geo/Coast"), ExtraTags))
+					{
+						Coast->Build(Piece, bClosed && Pieces.Num() == 1);
+					}
+				}
+			}
+		}
+	}
+
 	// --- Summary ------------------------------------------------------------------------------------------------
 	const TCHAR* Verb = bSpawn ? TEXT("spawned") : TEXT("would spawn");
 	UE_LOG(LogDTGeo, Display, TEXT("[GeoImport] Roads in file %d -> %s %d road pieces, %d traffic lanes (%d junction links)"),
@@ -875,6 +1001,11 @@ void ADTGeoImporter::RunImport(bool bSpawn)
 		Stats.RoadsOutsideZone, Stats.RoadsMalformed, Stats.RoadsTooShort, Stats.RoadsTrimmed, Stats.PointsInvalid);
 	UE_LOG(LogDTGeo, Display, TEXT("[GeoImport] Crossings in file %d -> %s %d province signs (%d outside zone, %d malformed)"),
 		Stats.CrossingsInFile, Verb, Stats.Signs, Stats.CrossingsOutsideZone, Stats.CrossingsMalformed);
+	if (CoastRoot.IsValid())
+	{
+		UE_LOG(LogDTGeo, Display, TEXT("[GeoImport] Coast lines in file %d -> %s %d coastline pieces at sea level (%d outside zone, %d malformed)"),
+			Stats.CoastLinesInFile, Verb, Stats.CoastPieces, Stats.CoastLinesOutsideZone, Stats.CoastLinesMalformed);
+	}
 
 	if (bTraceGround)
 	{
@@ -908,9 +1039,9 @@ void ADTGeoImporter::RunImport(bool bSpawn)
 	}
 
 	const double Elapsed = FPlatformTime::Seconds() - StartTime;
-	LastRunSummary = FString::Printf(TEXT("%s | zone '%s' | %d roads, %d lanes, %d signs | %d skipped | %.2f s"),
-		*Mode, *GetZoneLabel(), Stats.RoadPieces, Stats.Lanes, Stats.Signs,
-		Stats.RoadsMalformed + Stats.RoadsTooShort + Stats.CrossingsMalformed, Elapsed);
+	LastRunSummary = FString::Printf(TEXT("%s | zone '%s' | %d roads, %d lanes, %d signs, %d coast | %d skipped | %.2f s"),
+		*Mode, *GetZoneLabel(), Stats.RoadPieces, Stats.Lanes, Stats.Signs, Stats.CoastPieces,
+		Stats.RoadsMalformed + Stats.RoadsTooShort + Stats.CrossingsMalformed + Stats.CoastLinesMalformed, Elapsed);
 	UE_LOG(LogDTGeo, Display, TEXT("[GeoImport] ===== done in %.2f s%s ====="), Elapsed,
 		bSpawn ? *FString::Printf(TEXT(" | undo with 'Clear Last Run' (tag %s) or 'Clear Zone' (tag %s)"), *ExtraTags[0].ToString(), *ExtraTags[1].ToString()) : TEXT(""));
 }

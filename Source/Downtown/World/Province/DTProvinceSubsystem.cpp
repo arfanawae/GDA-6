@@ -2,6 +2,8 @@
 #include "World/Geo/DTGeoLibrary.h"
 #include "World/Geo/DTGeoSettings.h"
 #include "Core/DTGameMode.h"
+#include "Core/Save/DTProgressSubsystem.h"
+#include "Engine/GameInstance.h"
 #include "Downtown.h"
 #include "Engine/DataTable.h"
 #include "Engine/World.h"
@@ -114,6 +116,30 @@ void UDTProvinceSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	TArray<FString> Warnings;
 	Geometry.Build(Table, Warnings);
 	LogLoadSummary(Table, Warnings);
+
+	// Restore saved progress and start recording province changes.
+	if (UGameInstance* GI = InWorld.GetGameInstance())
+	{
+		if (UDTProgressSubsystem* Progress = GI->GetSubsystem<UDTProgressSubsystem>())
+		{
+			Progress->AttachProvinceSubsystem(this);
+		}
+	}
+}
+
+int32 UDTProvinceSubsystem::GetVisitedCountInRegion(EDTThaiRegion Region, int32& OutTotal) const
+{
+	OutTotal = 0;
+	int32 Count = 0;
+	for (const TPair<FName, FDTProvinceGeometry::FEntry>& Pair : Geometry.GetEntries())
+	{
+		if (Pair.Value.Row.Region == Region)
+		{
+			++OutTotal;
+			Count += Visited.Contains(Pair.Key) ? 1 : 0;
+		}
+	}
+	return Count;
 }
 
 void UDTProvinceSubsystem::LogLoadSummary(const UDataTable* Table, const TArray<FString>& Warnings) const

@@ -124,6 +124,28 @@ def load_province_polygons() -> tuple[dict[str, Polygon], dict]:
     return polys, {r["Code"]: r for r in rows}
 
 
+ZONE_PRESETS = {"bangkok-metro": "TH-10,TH-11,TH-12,TH-13,TH-73,TH-74", "test-area": "TH-10,TH-12,TH-13"}
+
+
+def resolve_area(area: str, rows: dict) -> list[str]:
+    """Codes, region names, presets or 'all' -> sorted list of province codes."""
+    key = area.strip().lower()
+    if key == "all":
+        return sorted(rows)
+    area = ZONE_PRESETS.get(key, area)
+    codes: list[str] = []
+    for token in area.split(","):
+        t = token.strip()
+        region = [c for c, r in rows.items() if r["Region"].lower() == t.lower()]
+        if region:
+            codes.extend(region)
+        elif t.upper() in rows:
+            codes.append(t.upper())
+        else:
+            raise SystemExit(f"[ERROR] unknown province/region '{t}'")
+    return sorted(set(codes))
+
+
 def heading_deg(line: LineString, d: float) -> float:
     a = line.interpolate(max(0.0, d - 500.0))
     b = line.interpolate(min(line.length, d + 500.0))
@@ -134,7 +156,9 @@ def heading_deg(line: LineString, d: float) -> float:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--input", required=True, type=Path)
-    parser.add_argument("--area", required=True, help="province codes, e.g. TH-10,TH-12,TH-13")
+    parser.add_argument("--area", required=True,
+                        help="province codes (TH-10,TH-12), a region (north, northeast, central, east, west, south), "
+                             "a preset (bangkok-metro, test-area) or 'all'")
     parser.add_argument("--name", default="TestArea")
     parser.add_argument("--classes", default="motorway,trunk,primary",
                         help="OSM highway classes (links are added automatically)")
@@ -148,7 +172,7 @@ def main() -> None:
     classes |= {f"{c}_link" for c in classes}
 
     polys, rows = load_province_polygons()
-    area_codes = [c.strip().upper() for c in args.area.split(",")]
+    area_codes = resolve_area(args.area, rows)
     area = unary_union([polys[c] for c in area_codes])
     clip = area.buffer(args.margin_m * 100.0)
 

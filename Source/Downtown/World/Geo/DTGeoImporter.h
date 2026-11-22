@@ -8,6 +8,7 @@
 class ADTGeoRoad;
 class ADTTrafficLane;
 class ADTProvinceSign;
+class ADTGeoCoastline;
 class UStaticMesh;
 class UBillboardComponent;
 class UDataTable;
@@ -32,6 +33,7 @@ enum class EDTGeoClearMode : uint8
  *   - ADTGeoRoad pieces (visual, chunked for World Partition)
  *   - ADTTrafficLane graph for the existing traffic AI (left-hand traffic!)
  *   - ADTProvinceSign at every road/province-border crossing
+ *   - ADTGeoCoastline splines from CoastFile (optional, build_heightmap.py --sea)
  *
  * Testing workflow (see Docs/ThailandMap.md):
  *   1. Set ZoneFilter ("test-area", "TH-12", "Nonthaburi", "north", empty = everything in the file)
@@ -73,9 +75,19 @@ public:
 	UFUNCTION(CallInEditor, Category = "Geo Import")
 	void ClearImported();
 
-	/** Path relative to the project's Content folder. */
+	/** Path relative to the project's Content folder. Empty = no roads/lanes/signs (e.g. coast only). */
 	UPROPERTY(EditAnywhere, Category = "Geo Import")
 	FString RoadsFile = TEXT("_Downtown/Data/Roads/Roads_TestArea.json");
+
+	/** Optional Coast_<name>.json (relative to Content) from build_heightmap.py --sea. */
+	UPROPERTY(EditAnywhere, Category = "Geo Import|Coast")
+	FString CoastFile;
+
+	UPROPERTY(EditAnywhere, Category = "Geo Import|Coast") bool bImportCoast = true;
+	UPROPERTY(EditAnywhere, Category = "Geo Import|Coast") TSubclassOf<ADTGeoCoastline> CoastClass;
+
+	/** Height of the coastline splines above sea level (world Z 0 by the pipeline convention). */
+	UPROPERTY(EditAnywhere, Category = "Geo Import|Coast") float CoastZOffsetCm = 0.f;
 
 	/**
 	 * Which provinces to import. Empty or "all" = everything in RoadsFile.
@@ -182,6 +194,10 @@ protected:
 		int32 CrossingsMalformed = 0;
 		int32 CrossingsOutsideZone = 0;
 		int32 Signs = 0;
+		int32 CoastLinesInFile = 0;
+		int32 CoastLinesMalformed = 0;
+		int32 CoastLinesOutsideZone = 0;
+		int32 CoastPieces = 0;
 		int32 GroundHits = 0;
 		int32 GroundMisses = 0;
 		int32 WarningsLogged = 0;
@@ -194,6 +210,10 @@ protected:
 	bool ResolveZoneFilter(const FDTProvinceGeometry& Geometry, TArray<FName>& OutCodes, bool& bOutAll) const;
 	FString GetZoneLabel() const;
 	bool ParseRoad(const TSharedPtr<FJsonValue>& Value, FRoadData& Out, int32& OutBadPoints, FString& OutError) const;
+	static bool ParsePoint2D(const TSharedPtr<FJsonValue>& Value, FVector2D& Out);
+
+	/** Reads, parses and validates a pipeline JSON (projection + area coverage). False = abort the run. */
+	bool LoadGeoFile(const FString& RelativePath, const TCHAR* Kind, const TArray<FName>& ZoneCodes, bool bAll, TSharedPtr<FJsonObject>& OutRoot) const;
 	void Warn(FImportStats& Stats, const FString& Message) const;
 	int32 ClearByTag(FName Tag, const TCHAR* What);
 

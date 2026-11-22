@@ -68,6 +68,15 @@ python build_roads.py --input raw/roads.parquet --area TH-10,TH-12,TH-13 --name 
 # Terrain: Copernicus DEM -> 16-bit Landscape heightmap (+ road gradient report)
 python build_heightmap.py --area TH-50,TH-51,TH-52 --name North3 --download --roads ../../Content/_Downtown/Data/Roads/Roads_North3.json
 
+# Road beds: grade-limited, smoothed terrain along every road (prints gradients before/after)
+python build_heightmap.py --area TH-50,TH-51,TH-52 --name North3 --roads ../../Content/_Downtown/Data/Roads/Roads_North3.json --flatten-roads
+
+# Sea + coastline: seabed below Z 0, Content/_Downtown/Data/Coast/Coast_<name>.json for DTGeoImporter.CoastFile
+python build_heightmap.py --area TH-82,TH-83 --name Phuket --download --sea
+
+# National highways per region (--area accepts north/northeast/central/east/west/south, presets, or all)
+python build_roads.py --input raw/roads.parquet --area south --name Highways_South --classes motorway,trunk
+
 # Visual check
 python preview_area.py --name TestArea --out raw/preview_TestArea.png
 
@@ -84,6 +93,7 @@ python geo_projection.py
 | `build_provinces.py` | → `Content/_Downtown/Data/Provinces/DT_Provinces.json`, `provinces_summary.csv`, `map_bounds.json` |
 | `build_roads.py` | → `Content/_Downtown/Data/Roads/Roads_<name>.json` (roads + crossings). Also accepts GeoJSON or Overpass JSON |
 | `preview_area.py` | renders provinces + roads + crossings to a PNG |
+| `terrain_ops.py` | land/sea mask, seabed, coastline extraction, road beds, gradient stats (used by build_heightmap.py) |
 | `build_heightmap.py` | Copernicus GLO-30 DEM → `.r16`/16-bit PNG heightmap + exact Landscape import values (sea level = Z 0) + road gradient table per vertical scale |
 | `prepare_geodata.py` | step 0: clean/filter/split raw GeoJSON / Shapefile / CSV per province or zone |
 

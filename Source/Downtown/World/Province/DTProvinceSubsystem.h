@@ -70,6 +70,13 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Province")
 	void ResetVisited();
 
+	/** Visited / total provinces of one region (progress panel on the world map). */
+	UFUNCTION(BlueprintPure, Category = "Province")
+	int32 GetVisitedCountInRegion(EDTThaiRegion Region, int32& OutTotal) const;
+
+	/** Province outlines and lookup (C++ only; used by the world map widget). */
+	const FDTProvinceGeometry& GetGeometry() const { return Geometry; }
+
 	/** Moves the player (or the vehicle they drive) to a province's reference point. */
 	UFUNCTION(BlueprintCallable, Category = "Province")
 	bool TeleportPlayerToProvince(FName Code);

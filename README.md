@@ -10,6 +10,7 @@ Indie-scale prototype of a third-person open-world action game built with **Unre
 | Wanted level (1–3 stars) | `UDTWantedSubsystem`, `UDTPoliceDispatchSubsystem`, `ADTPoliceAIController`, `ADTPoliceVehicleAIController` |
 | HUD & minimap | `ADTHUD`, `UDTHUDWidget`, `UDTMinimapWidget`, `UDTMinimapSubsystem`, `UDTMapIconComponent` |
 | Thailand map (77 provinces, 1:20) | `UDTGeoLibrary`, `UDTGeoSettings`, `UDTProvinceSubsystem`, `ADTProvinceSign`, `ADTGeoImporter`, `ADTGeoRoad` |
+| Progress & world map | `UDTProgressSubsystem` + `UDTSaveGame` (auto-save of visited provinces), `UDTWorldMapWidget` (M), `ADTGeoCoastline` |
 
 ## Documents
 - [`Docs/GDD.md`](Docs/GDD.md) — Game Design Document + step-by-step roadmap (Thai)

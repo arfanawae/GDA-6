@@ -81,3 +81,16 @@ Do them in order. Every step can be tested on its own in a `L_Test_*` map.
 4. `WBP_Minimap` (parent `UDTMinimapWidget`): an Image named **MapImage** using `M_MinimapMask`; a Canvas with icons positioned from `GetIconViews()` (offset from the centre);
    draw the search circle from `GetSearchArea()`.
 5. Add `UDTMapIconComponent` (Player, rotate with owner) to `BP_PlayerCharacter`.
+
+## 10. Thailand map tools
+See `Docs/ThailandMap.md` (Thai) for the full province / road / terrain / coast workflow with `DTGeoImporter`.
+
+## 11. World map (M) + saved progress
+1. `IA_Map` (Digital) and a new context `IMC_Global`: M -> IA_Map (enable *Trigger when Paused* on IA_Map if you turn on bPauseWhileMapOpen).
+2. `BP_PlayerController`: GlobalContext = `IMC_Global`, MapAction = `IA_Map`, WorldMapClass = `WBP_WorldMap`.
+3. `WBP_WorldMap` (parent `DTWorldMapWidget`): full-screen; set **LabelFont** to a Thai font (Noto Sans Thai / Sarabun);
+   optional BackgroundBrush = the country minimap texture from `build_provinces.py --minimap` and BackgroundWorldBounds = the
+   `minimap` bounds in `map_bounds.json`. Implement `OnHoveredProvinceChanged` for a tooltip; use
+   `DTProvinceSubsystem.GetVisitedCountInRegion` for a per-region progress panel.
+4. Saving needs no setup: `DTProgressSubsystem` loads/saves slot `Downtown_Progress` automatically
+   (`dt.Save.Info`, `dt.Save.Now`, `dt.Save.Reset` in the console).
